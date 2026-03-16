@@ -10,6 +10,17 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
+// Vercel プレビュー用 feedback.js を許可する CSP（vercel.json の headers は rewrite 先で効かないためここで設定）
+const csp =
+  "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; " +
+  "img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com data:; " +
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+  "script-src 'self' https://vercel.live; connect-src 'self' https:;";
+app.use((_req, res, next) => {
+  res.setHeader("Content-Security-Policy", csp);
+  next();
+});
+
 const agents = [
   {
     id: "market-research",
