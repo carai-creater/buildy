@@ -136,7 +136,12 @@ app.get("/api/me", (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Buildy backend listening on http://localhost:${PORT}`);
-});
+// Vercel ではサーバーレスとして api/index.js から使うため listen しない
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Buildy backend listening on http://localhost:${PORT}`);
+  });
+}
+
+export default app;
 
