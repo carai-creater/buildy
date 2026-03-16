@@ -1,0 +1,14 @@
+{
+  "name": "buildy-landing",
+  "version": "1.0.0",
+  "description": "Buildy（ビルディ）のコンセプトを紹介するシンプルなランディングページと簡易バックエンド",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {}
+}
+
