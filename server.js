@@ -1,4 +1,5 @@
 import express from "express";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -76,6 +77,17 @@ const agents = [
 ];
 
 app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, "..")));
+
+// Vercel では static が index を見つけられないことがあるため GET / を明示的に処理
+app.get("/", (req, res, next) => {
+  const roots = [__dirname, path.join(__dirname, ".."), process.cwd()];
+  for (const root of roots) {
+    const p = path.join(root, "index.html");
+    if (fs.existsSync(p)) return res.sendFile(p);
+  }
+  next();
+});
 
 app.get("/api/agents", (_req, res) => {
   res.json({ agents });
