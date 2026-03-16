@@ -4,11 +4,23 @@
   "description": "Buildy（ビルディ）のコンセプトを紹介するシンプルなランディングページと簡易バックエンド",
   "type": "module",
   "scripts": {
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "dev:next": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "@supabase/supabase-js": "^2.45.0",
+    "express": "^4.21.2",
+    "next": "^14.2.0",
+    "openai": "^4.52.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.0.0"
+  }
 }
-
