@@ -19,7 +19,14 @@ app.use((req, _res, next) => {
       sessionId: "785dd1",
       location: "server.js:request",
       message: "request received",
-      data: { method: req.method, path: req.path, url: req.url },
+      data: {
+        method: req.method,
+        path: req.path,
+        url: req.url,
+        originalUrl: req.originalUrl,
+        __dirname,
+        hypothesisId: "A",
+      },
       timestamp: Date.now(),
       hypothesisId: "A",
     }),
@@ -165,6 +172,25 @@ app.get("/api/me", (req, res) => {
     },
   });
 });
+
+// #region agent log
+app.use((req, res, next) => {
+  if (res.headersSent) return next();
+  fetch("http://127.0.0.1:7621/ingest/1a015be2-eba8-436a-b6d2-cc397703420d", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "785dd1" },
+    body: JSON.stringify({
+      sessionId: "785dd1",
+      location: "server.js:no-route",
+      message: "no route matched",
+      data: { path: req.path, originalUrl: req.originalUrl, method: req.method },
+      timestamp: Date.now(),
+      hypothesisId: "C",
+    }),
+  }).catch(() => {});
+  res.status(404).json({ error: "not_found", path: req.path });
+});
+// #endregion
 
 // Vercel ではサーバーレスとして api/index.js から使うため listen しない
 if (!process.env.VERCEL) {
