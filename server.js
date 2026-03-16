@@ -82,9 +82,26 @@ app.use(express.static(path.join(__dirname, "..")));
 // Vercel では static が index を見つけられないことがあるため GET / を明示的に処理
 app.get("/", (req, res, next) => {
   const roots = [__dirname, path.join(__dirname, ".."), process.cwd()];
-  for (const root of roots) {
+  const tried = roots.map((root) => {
     const p = path.join(root, "index.html");
-    if (fs.existsSync(p)) return res.sendFile(p);
+    return { root, p, exists: fs.existsSync(p) };
+  });
+  // #region agent log
+  fetch("http://127.0.0.1:7621/ingest/1a015be2-eba8-436a-b6d2-cc397703420d", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "785dd1" },
+    body: JSON.stringify({
+      sessionId: "785dd1",
+      location: "server.js:GET /",
+      message: "GET / handler",
+      data: { path: req.path, tried, hypothesisId: "A" },
+      timestamp: Date.now(),
+      hypothesisId: "A",
+    }),
+  }).catch(() => {});
+  // #endregion
+  for (const { p, exists } of tried) {
+    if (exists) return res.sendFile(p);
   }
   next();
 });
