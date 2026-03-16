@@ -25,6 +25,20 @@ function getClientId(req: NextRequest): string {
 }
 
 export async function POST(req: NextRequest) {
+  // #region agent log
+  fetch("http://127.0.0.1:7621/ingest/1a015be2-eba8-436a-b6d2-cc397703420d", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "785dd1" },
+    body: JSON.stringify({
+      sessionId: "785dd1",
+      location: "app/api/agent/execute/route.ts:POST",
+      message: "execute route hit",
+      data: { handler: "Next.js" },
+      timestamp: Date.now(),
+      hypothesisId: "C",
+    }),
+  }).catch(() => {});
+  // #endregion
   const clientId = getClientId(req);
   const { allowed, remaining } = checkRateLimit(clientId);
   if (!allowed) {

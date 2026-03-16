@@ -10,6 +10,24 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
+// #region agent log
+app.use((req, _res, next) => {
+  fetch("http://127.0.0.1:7621/ingest/1a015be2-eba8-436a-b6d2-cc397703420d", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "785dd1" },
+    body: JSON.stringify({
+      sessionId: "785dd1",
+      location: "server.js:request",
+      message: "request received",
+      data: { method: req.method, path: req.path, url: req.url },
+      timestamp: Date.now(),
+      hypothesisId: "A",
+    }),
+  }).catch(() => {});
+  next();
+});
+// #endregion
+
 // Vercel プレビュー用 feedback.js を許可する CSP（script-src-elem を明示しないと default-src でブロックされる）
 const csp =
   "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; " +

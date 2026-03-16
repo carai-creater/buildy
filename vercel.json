@@ -1,5 +1,8 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/api" }],
+  "rewrites": [
+    { "source": "/api/agent/:path*", "destination": "/api/agent/:path*" },
+    { "source": "/(.*)", "destination": "/api" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
