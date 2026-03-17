@@ -20,7 +20,7 @@
       <section class="page-main">
         <h1>クリエイター登録</h1>
         <p class="page-lead">Buildy でエージェントを公開するには、まずクリエイターとして登録してください。</p>
-        <div id="register-with-auth" style="display: none;">
+        <div id="register-with-auth">
           <p class="page-lead" style="margin-bottom: 1rem;">Googleで登録するか、メール・パスワードで登録してください。</p>
           <p style="margin-bottom: 1rem;">
             <button type="button" id="google-signup-btn" class="btn primary-btn" style="display: inline-flex; align-items: center; gap: 0.5rem;">
@@ -39,7 +39,8 @@
             <button type="submit" class="btn primary-btn">登録する</button>
           </form>
         </div>
-        <div id="register-no-auth">
+        <div id="register-no-auth" style="display: none;">
+          <p class="page-lead" style="margin-bottom: 1rem;">表示名とメールアドレスで登録します。パスワードやGoogleで登録するには、Supabase の URL と anon キーを環境変数に設定してください。</p>
           <form id="register-form" class="page-form" style="max-width: 28rem;">
             <label for="name2">表示名</label>
             <input id="name2" name="name" type="text" required placeholder="山田 太郎" />
@@ -64,8 +65,8 @@
           .then(function (r) { return r.json(); })
           .then(function (config) {
             if (config.supabaseUrl && config.supabaseAnonKey) {
-              noAuth.style.display = "none";
               withAuth.style.display = "block";
+              noAuth.style.display = "none";
               var redirectTo = window.location.origin + (window.location.pathname.replace(/[^/]+$/, "") || "/") + "auth-callback.html";
               var supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
               var googleBtn = document.getElementById("google-signup-btn");
@@ -130,6 +131,8 @@
                 });
               }
             } else {
+              withAuth.style.display = "none";
+              noAuth.style.display = "block";
               if (!form || !resultEl) return;
               form.addEventListener("submit", function (e) {
                 e.preventDefault();
@@ -186,6 +189,8 @@
             }
           })
           .catch(function () {
+            withAuth.style.display = "none";
+            if (noAuth) noAuth.style.display = "block";
             if (form) {
               form.addEventListener("submit", function (e) {
                 e.preventDefault();

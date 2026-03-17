@@ -14,7 +14,7 @@
 |--------|------|-----|
 | `SUPABASE_URL` | Supabase の Project URL | `https://xxxx.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase の service_role キー（Legacy） | `eyJ...` |
-| `SUPABASE_ANON_KEY` | Supabase の anon / public キー（クリエイター登録のメール認証用・クライアントに渡す） | `eyJ...` |
+| `SUPABASE_ANON_KEY` | Supabase の anon / public キー（クリエイター登録の「Googleで登録」・メール・パスワード用。`/api/config` でクライアントに渡す） | `eyJ...` |
 | `OPENAI_API_KEY` | OpenAI API キー（Next.js の execute 用） | `sk-...` |
 | `OPENAI_MODEL` | 利用モデル（任意） | `gpt-4o-mini` |
 
