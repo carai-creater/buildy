@@ -46,7 +46,7 @@ app.use((req, _res, next) => {
 const csp =
   "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; " +
   "frame-src 'self' https://vercel.live; " +
-  "img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com data:; " +
+  "img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com https://vercel.live data:; " +
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
   "script-src 'self' 'unsafe-inline' https://vercel.live https://cdn.jsdelivr.net; " +
   "script-src-elem 'self' 'unsafe-inline' https://vercel.live https://cdn.jsdelivr.net; " +
