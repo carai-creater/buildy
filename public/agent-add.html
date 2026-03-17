@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>エージェントを追加 | Buildy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <a href="./index.html" class="page-logo">Buildy</a>
+        <nav class="page-nav">
+          <a href="./index.html">トップ</a>
+          <a href="./agents.html">エージェント一覧</a>
+          <a href="./creators-register.html">クリエイター登録</a>
+        </nav>
+      </header>
+      <section class="page-main">
+        <h1>エージェントを追加</h1>
+        <p class="page-lead">新しいAIエージェントをマーケットに登録します。先に<a href="./creators-register.html">クリエイター登録</a>が必要です。</p>
+        <form id="agent-form" class="page-form" style="max-width: 32rem;">
+          <label for="name">エージェント名 *</label>
+          <input id="name" name="name" type="text" required placeholder="例: 市場調査エージェント" />
+          <label for="category">カテゴリ</label>
+          <input id="category" name="category" type="text" placeholder="例: 市場調査" />
+          <label for="shortDescription">短い説明</label>
+          <textarea id="shortDescription" name="shortDescription" rows="2" placeholder="このエージェントでできること"></textarea>
+          <label for="pricePerRun">1実行あたりの料金（円）</label>
+          <input id="pricePerRun" name="pricePerRun" type="number" min="0" value="0" />
+          <label for="system_prompt">システムプロンプト（LLM用）</label>
+          <textarea id="system_prompt" name="system_prompt" rows="4" placeholder="You are a helpful assistant. ..."></textarea>
+          <label for="creator_id">クリエイターID（登録後に表示されたIDを貼り付け）</label>
+          <input id="creator_id" name="creator_id" type="text" placeholder="uuid" />
+          <button type="submit" class="btn primary-btn">追加する</button>
+        </form>
+        <p id="agent-result" style="margin-top: 1rem;"></p>
+      </section>
+    </main>
+    <script>
+      try {
+        const saved = localStorage.getItem("buildy_creator_id");
+        if (saved) document.getElementById("creator_id").placeholder = saved;
+      } catch (_) {}
+      document.getElementById("agent-form").addEventListener("submit", function (e) {
+        e.preventDefault();
+        const creatorId = document.getElementById("creator_id").value.trim() || undefined;
+        const payload = {
+          name: document.getElementById("name").value.trim(),
+          category: document.getElementById("category").value.trim() || undefined,
+          shortDescription: document.getElementById("shortDescription").value.trim() || undefined,
+          pricePerRun: parseInt(document.getElementById("pricePerRun").value, 10) || 0,
+          system_prompt: document.getElementById("system_prompt").value.trim() || undefined,
+          creator_id: creatorId || undefined,
+        };
+        const resultEl = document.getElementById("agent-result");
+        resultEl.textContent = "追加中…";
+        fetch("/api/agents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.agent) {
+              resultEl.textContent = "追加しました: " + data.agent.name + "（ID: " + data.agent.id + "） → <a href=\"./agents.html\">一覧へ</a>";
+            } else {
+              resultEl.textContent = "エラー: " + (data.error || "追加に失敗しました");
+            }
+          })
+          .catch(() => {
+            resultEl.textContent = "通信エラーです。";
+          });
+      });
+    </script>
+  </body>
+</html>

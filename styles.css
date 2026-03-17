@@ -1238,3 +1238,30 @@ button {
   }
 }
 
+.page-form label {
+  display: block;
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+  color: var(--text-sub);
+}
+.page-form input,
+.page-form textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  font: inherit;
+}
+.page-form button {
+  margin-top: 1.25rem;
+}
+.page-empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-sub);
+}
+.page-empty a {
+  color: var(--accent);
+}
+

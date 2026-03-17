@@ -2,12 +2,17 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createClient } from "@supabase/supabase-js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 app.use(express.json());
 
@@ -48,34 +53,6 @@ app.use((_req, res, next) => {
   next();
 });
 
-const agents = [
-  {
-    id: "market-research",
-    name: "市場調査エージェント",
-    category: "市場調査",
-    shortDescription:
-      "Web検索から競合比較・インサイト要約まで、自律的にレポートを作成します。",
-    pricePerRun: 500,
-    hero: true,
-  },
-  {
-    id: "sns-ops",
-    name: "SNS運用エージェント",
-    category: "SNS運用",
-    shortDescription:
-      "投稿案・ハッシュタグ・投稿カレンダーを、自社トーンに合わせて自動生成します。",
-    pricePerRun: 300,
-  },
-  {
-    id: "code-review",
-    name: "コードレビューエージェント",
-    category: "開発・QA",
-    shortDescription:
-      "GitHubリポジトリを解析し、改善ポイントや潜在バグをコメント形式で提案します。",
-    pricePerRun: 800,
-  },
-];
-
 app.use(express.static(__dirname));
 app.use(express.static(path.join(__dirname, "..")));
 // Vercel の api 関数バンドル内の静的ファイル（api/static/ に配置）
@@ -115,70 +92,89 @@ app.get("/index.html", (req, res, next) => {
   next();
 });
 
-app.get("/api/agents", (_req, res) => {
+app.get("/api/agents", async (_req, res) => {
+  if (!supabase) return res.json({ agents: [] });
+  const { data, error } = await supabase.from("agents").select("id, name, category, short_description, price_per_run, hero").order("created_at", { ascending: false });
+  if (error) return res.status(500).json({ error: error.message, agents: [] });
+  const agents = (data || []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    category: r.category || "",
+    shortDescription: r.short_description || "",
+    pricePerRun: r.price_per_run ?? 0,
+    hero: !!r.hero,
+  }));
   res.json({ agents });
 });
 
-app.get("/api/agents/:id", (req, res) => {
-  const agent = agents.find((a) => a.id === req.params.id);
-  if (!agent) {
-    return res.status(404).json({ error: "Agent not found" });
-  }
-  res.json({ agent });
+app.get("/api/agents/:id", async (req, res) => {
+  if (!supabase) return res.status(404).json({ error: "Agent not found" });
+  const { data, error } = await supabase.from("agents").select("*").eq("id", req.params.id).single();
+  if (error || !data) return res.status(404).json({ error: "Agent not found" });
+  res.json({
+    agent: {
+      id: data.id,
+      name: data.name,
+      category: data.category,
+      shortDescription: data.short_description,
+      pricePerRun: data.price_per_run,
+      hero: data.hero,
+    },
+  });
 });
 
-app.post("/api/agents/:id/run", (req, res) => {
-  const agent = agents.find((a) => a.id === req.params.id);
-  if (!agent) {
-    return res.status(404).json({ error: "Agent not found" });
-  }
+app.post("/api/agents/:id/run", async (req, res) => {
+  const agent = supabase
+    ? (await supabase.from("agents").select("id, name").eq("id", req.params.id).single()).data
+    : null;
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
 
   const { query } = req.body || {};
   const safeQuery = typeof query === "string" && query.trim() ? query.trim() : "指定なし";
-
-  const runId = `run_${Date.now()}`;
-
-  const startedAt = new Date().toISOString();
-
-  const estimatedMinutes = agent.id === "market-research" ? 3 : 1;
-
-  const mockReport =
-    agent.id === "market-research"
-      ? {
-          title: "市場調査レポート（ダミー）",
-          overview:
-            "このレポートはデモ用のダミーです。実際にはWeb検索・情報整理・要約を自律的に行い、より詳細なレポートを生成します。",
-          inputQuery: safeQuery,
-          sections: [
-            {
-              heading: "1. 想定ターゲット市場",
-              body: "日本国内のD2Cブランドを中心としたコスメ市場を対象とし、オンライン直販チャネルを主軸としています。",
-            },
-            {
-              heading: "2. 代表的な競合プレイヤー（例）",
-              body: "競合A社、競合B社、競合C社などを想定し、それぞれのポジショニング・価格帯・強みを比較します。",
-            },
-            {
-              heading: "3. インサイト（例）",
-              body: "ユーザーは成分の透明性と口コミを重視する傾向が強く、SNS上のUGCが購入意思決定に与える影響が大きいことが示唆されます。",
-            },
-          ],
-        }
-      : {
-          title: `${agent.name} 実行結果（ダミー）`,
-          overview:
-            "この結果はバックエンド連携のデモ用です。実際の運用時には、外部APIやAIモデルと連携して結果を生成します。",
-          inputQuery: safeQuery,
-        };
-
   res.json({
-    runId,
+    runId: `run_${Date.now()}`,
     agentId: agent.id,
-    startedAt,
-    estimatedMinutes,
+    startedAt: new Date().toISOString(),
+    estimatedMinutes: 1,
     status: "completed",
-    report: mockReport,
+    report: {
+      title: `${agent.name} 実行結果（ダミー）`,
+      overview: "実際の運用時には、外部APIやAIモデルと連携して結果を生成します。",
+      inputQuery: safeQuery,
+    },
   });
+});
+
+// クリエイター登録
+app.post("/api/creators/register", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+  const { name, email } = req.body || {};
+  if (!name || !email || typeof name !== "string" || typeof email !== "string") {
+    return res.status(400).json({ error: "name and email are required" });
+  }
+  const { data, error } = await supabase.from("creators").insert({ name: name.trim(), email: email.trim() }).select("id, name, email").single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.status(201).json({ creator: data });
+});
+
+// エージェント追加（クリエイター登録済みの id を creator_id に指定）
+app.post("/api/agents", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+  const { name, category, shortDescription, pricePerRun, system_prompt, creator_id } = req.body || {};
+  if (!name || typeof name !== "string") return res.status(400).json({ error: "name is required" });
+  const id = `agent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const row = {
+    id,
+    name: name.trim(),
+    category: category != null ? String(category).trim() : null,
+    short_description: shortDescription != null ? String(shortDescription).trim() : null,
+    price_per_run: typeof pricePerRun === "number" ? pricePerRun : parseInt(pricePerRun, 10) || 0,
+    system_prompt: system_prompt && typeof system_prompt === "string" ? system_prompt.trim() : "You are a helpful assistant.",
+    creator_id: creator_id || null,
+  };
+  const { data, error } = await supabase.from("agents").insert(row).select("id, name, category, short_description, price_per_run").single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.status(201).json({ agent: { id: data.id, name: data.name, category: data.category, shortDescription: data.short_description, pricePerRun: data.price_per_run } });
 });
 
 app.post("/api/auth/login", (req, res) => {
