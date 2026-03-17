@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>クリエイターダッシュボード | Buildy</title>
+    <title>マイページ | Buildy</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -24,11 +24,60 @@
           <p><a href="./creators-register.html" class="btn primary-btn">クリエイター登録</a></p>
         </div>
         <div id="dashboard-content" style="display: none;">
-          <h1>クリエイターダッシュボード</h1>
+          <h1>マイページ</h1>
           <p id="dashboard-welcome" class="page-lead"></p>
-          <p><a href="./agent-add.html" class="btn primary-btn">＋ エージェントを追加</a></p>
-          <h2 style="margin-top: 2rem;">あなたのエージェント</h2>
-          <div id="dashboard-agents" class="page-card-grid"></div>
+          <div id="dashboard-after-register" style="display: none; margin-bottom: 1.5rem; padding: 1rem; background: var(--accent-soft); border-radius: var(--radius-md);">
+            <p style="margin: 0 0 0.5rem 0;">登録が完了しました。次はエージェントをアップロードしてください。</p>
+            <a href="./agent-add.html" class="btn primary-btn">エージェントをアップロードする</a>
+          </div>
+
+          <nav class="dashboard-nav" style="margin: 1.5rem 0; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            <a href="#section-agents" class="btn">自分のエージェント</a>
+            <a href="#section-earnings" class="btn">収益</a>
+            <a href="#section-profile" class="btn">プロフィール設定</a>
+            <a href="#section-other" class="btn">その他</a>
+          </nav>
+
+          <section id="section-agents" style="margin-top: 2rem;">
+            <h2>自分のエージェント</h2>
+            <p><a href="./agent-add.html" class="btn primary-btn">＋ エージェントを追加</a></p>
+            <div id="dashboard-agents" class="page-card-grid"></div>
+          </section>
+
+          <section id="section-earnings" style="margin-top: 2.5rem;">
+            <h2>収益</h2>
+            <div class="page-card" style="max-width: 24rem; padding: 1.25rem;">
+              <p style="margin: 0 0 0.5rem 0; color: var(--text-sub);">総実行数</p>
+              <p id="dashboard-total-runs" style="margin: 0; font-size: 1.5rem; font-weight: 600;">0 回</p>
+              <p style="margin: 1rem 0 0.5rem 0; color: var(--text-sub);">総売上（税抜）</p>
+              <p id="dashboard-total-earnings" style="margin: 0; font-size: 1.5rem; font-weight: 600;">¥0</p>
+              <p style="margin: 0.75rem 0 0; font-size: 0.875rem; color: var(--text-sub);">※ 決済連携後に反映されます。</p>
+            </div>
+          </section>
+
+          <section id="section-profile" style="margin-top: 2.5rem;">
+            <h2>プロフィール設定</h2>
+            <form id="profile-form" class="page-form" style="max-width: 28rem;">
+              <label for="profile-name">表示名</label>
+              <input id="profile-name" name="name" type="text" required placeholder="山田 太郎" />
+              <label for="profile-email">メールアドレス</label>
+              <input id="profile-email" name="email" type="email" required placeholder="you@example.com" />
+              <button type="submit" class="btn primary-btn">保存する</button>
+            </form>
+            <p id="profile-result" style="margin-top: 0.75rem; min-height: 1.5em;"></p>
+          </section>
+
+          <section id="section-other" style="margin-top: 2.5rem;">
+            <h2>その他</h2>
+            <ul style="margin: 0; padding-left: 1.25rem;">
+              <li><a href="./agent-add.html">エージェントを追加する</a></li>
+              <li><a href="./agents.html">エージェント一覧（公開ページ）</a></li>
+              <li><a href="./index.html">トップページ</a></li>
+            </ul>
+            <p style="margin-top: 1rem;">
+              <button type="button" id="dashboard-logout" class="btn">ログアウト（この端末の登録情報を解除）</button>
+            </p>
+          </section>
         </div>
       </section>
     </main>
@@ -56,6 +105,21 @@
           .then((data) => {
             content.style.display = "block";
             welcomeEl.textContent = "ようこそ、" + (data.creator ? data.creator.name : "") + " さん。";
+            var afterRegister = document.getElementById("dashboard-after-register");
+            if (afterRegister && (window.location.search || "").indexOf("registered=1") !== -1) {
+              afterRegister.style.display = "block";
+            }
+            var earnings = data.earnings || {};
+            var totalRuns = earnings.totalRuns != null ? earnings.totalRuns : 0;
+            var totalEarnings = earnings.totalEarnings != null ? earnings.totalEarnings : 0;
+            var runsEl = document.getElementById("dashboard-total-runs");
+            var earnEl = document.getElementById("dashboard-total-earnings");
+            if (runsEl) runsEl.textContent = totalRuns + " 回";
+            if (earnEl) earnEl.textContent = "¥" + Number(totalEarnings).toLocaleString();
+            var profileName = document.getElementById("profile-name");
+            var profileEmail = document.getElementById("profile-email");
+            if (profileName && data.creator) profileName.value = data.creator.name || "";
+            if (profileEmail && data.creator) profileEmail.value = data.creator.email || "";
             const agents = data.agents || [];
             if (agents.length === 0) {
               agentsEl.innerHTML = '<p class="page-empty">まだエージェントがありません。<a href="./agent-add.html">エージェントを追加</a>してください。</p>';
@@ -87,6 +151,42 @@
                 });
               });
             });
+            var profileForm = document.getElementById("profile-form");
+            var profileResult = document.getElementById("profile-result");
+            if (profileForm && profileResult) {
+              profileForm.addEventListener("submit", function (e) {
+                e.preventDefault();
+                var name = document.getElementById("profile-name").value.trim();
+                var email = document.getElementById("profile-email").value.trim();
+                profileResult.textContent = "保存中…";
+                profileResult.style.color = "";
+                fetch("/api/creators/" + encodeURIComponent(creatorId), {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ name: name, email: email }),
+                })
+                  .then(function (r) {
+                    if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || r.status); });
+                    return r.json();
+                  })
+                  .then(function () {
+                    profileResult.textContent = "保存しました。";
+                    profileResult.style.color = "var(--text-sub)";
+                    welcomeEl.textContent = "ようこそ、" + name + " さん。";
+                  })
+                  .catch(function (err) {
+                    profileResult.textContent = "エラー: " + (err.message || "保存に失敗しました");
+                    profileResult.style.color = "#c00";
+                  });
+              });
+            }
+            var logoutBtn = document.getElementById("dashboard-logout");
+            if (logoutBtn) {
+              logoutBtn.addEventListener("click", function () {
+                try { localStorage.removeItem("buildy_creator_id"); } catch (_) {}
+                location.reload();
+              });
+            }
           })
           .catch(() => {
             pleaseRegister.style.display = "block";

@@ -181,7 +181,29 @@ app.get("/api/creators/:id", async (req, res) => {
     pricePerRun: r.price_per_run ?? 0,
     createdAt: r.created_at,
   }));
-  res.json({ creator, agents });
+  // 収益は将来的に runs テーブルから集計。現状は 0
+  const totalRuns = 0;
+  const totalEarnings = 0;
+  res.json({ creator, agents, earnings: { totalRuns, totalEarnings } });
+});
+
+// プロフィール更新（表示名・メール）
+app.patch("/api/creators/:id", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+  const { name, email } = req.body || {};
+  const updates = {};
+  if (name !== undefined) updates.name = String(name).trim();
+  if (email !== undefined) updates.email = String(email).trim();
+  if (Object.keys(updates).length === 0) return res.status(400).json({ error: "name or email required" });
+  const { data, error } = await supabase
+    .from("creators")
+    .update(updates)
+    .eq("id", req.params.id)
+    .select("id, name, email")
+    .single();
+  if (error) return res.status(400).json({ error: error.message });
+  if (!data) return res.status(404).json({ error: "Creator not found" });
+  res.json({ creator: data });
 });
 
 // エージェント追加（クリエイター登録済みの id を creator_id に指定）

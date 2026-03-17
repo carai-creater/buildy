@@ -27,37 +27,53 @@
           <input id="email" name="email" type="email" required placeholder="you@example.com" />
           <button type="submit" class="btn primary-btn">登録する</button>
         </form>
-        <p id="register-result" style="margin-top: 1rem;"></p>
+        <p id="register-result" style="margin-top: 1rem; min-height: 1.5em;"></p>
       </section>
     </main>
     <script>
-      document.getElementById("register-form").addEventListener("submit", function (e) {
-        e.preventDefault();
-        const name = document.getElementById("name").value.trim();
-        const email = document.getElementById("email").value.trim();
-        const resultEl = document.getElementById("register-result");
-        resultEl.textContent = "登録中…";
-        fetch("/api/creators/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email }),
-        })
-          .then((r) => r.json())
-          .then((data) => {
-            if (data.creator) {
-              try {
-                localStorage.setItem("buildy_creator_id", data.creator.id);
-              } catch (_) {}
-              window.location.href = "./creator-dashboard.html";
-              return;
-            } else {
-              resultEl.textContent = "エラー: " + (data.error || "登録に失敗しました");
-            }
+      (function () {
+        var form = document.getElementById("register-form");
+        var resultEl = document.getElementById("register-result");
+        if (!form || !resultEl) return;
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+          var name = document.getElementById("name").value.trim();
+          var email = document.getElementById("email").value.trim();
+          if (!name || !email) {
+            resultEl.textContent = "表示名とメールアドレスを入力してください。";
+            resultEl.style.color = "#c00";
+            return;
+          }
+          resultEl.textContent = "登録中…";
+          resultEl.style.color = "";
+          var btn = form.querySelector('button[type="submit"]');
+          if (btn) btn.disabled = true;
+          fetch("/api/creators/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: name, email: email }),
           })
-          .catch(() => {
-            resultEl.textContent = "通信エラーです。";
-          });
-      });
+            .then(function (r) {
+              if (!r.ok) return r.text().then(function (t) { throw new Error(r.status + " " + t); });
+              return r.json();
+            })
+            .then(function (data) {
+              if (data.creator) {
+                try { localStorage.setItem("buildy_creator_id", data.creator.id); } catch (_) {}
+                window.location.href = "./creator-dashboard.html?registered=1";
+              } else {
+                resultEl.textContent = "エラー: " + (data.error || "登録に失敗しました");
+                resultEl.style.color = "#c00";
+                if (btn) btn.disabled = false;
+              }
+            })
+            .catch(function (err) {
+              resultEl.textContent = "通信エラーです。(" + (err.message || "") + ")";
+              resultEl.style.color = "#c00";
+              if (btn) btn.disabled = false;
+            });
+        });
+      })();
     </script>
   </body>
 </html>
