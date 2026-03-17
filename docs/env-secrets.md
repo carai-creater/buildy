@@ -14,10 +14,11 @@
 |--------|------|-----|
 | `SUPABASE_URL` | Supabase の Project URL | `https://xxxx.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase の service_role キー（Legacy） | `eyJ...` |
+| `SUPABASE_ANON_KEY` | Supabase の anon / public キー（クリエイター登録のメール認証用・クライアントに渡す） | `eyJ...` |
 | `OPENAI_API_KEY` | OpenAI API キー（Next.js の execute 用） | `sk-...` |
 | `OPENAI_MODEL` | 利用モデル（任意） | `gpt-4o-mini` |
 
-**NEXT_PUBLIC_*** はクライアントに露出するため、**キー類には使わない**。URL だけ `NEXT_PUBLIC_SUPABASE_URL` で渡す必要がある場合は可。
+**NEXT_PUBLIC_*** はクライアントに露出するため、**キー類には使わない**。URL だけ `NEXT_PUBLIC_SUPABASE_URL` で渡す必要がある場合は可。`SUPABASE_ANON_KEY` はメール認証を有効にする場合のみ設定し、`/api/config` 経由でクライアントに返します（詳細は `docs/supabase-auth-email.md`）。
 
 ## 設定手順（Vercel）
 

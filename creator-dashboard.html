@@ -81,9 +81,10 @@
         </div>
       </section>
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script>
       (function () {
-        const creatorId = (function () {
+        var creatorId = (function () {
           try {
             return localStorage.getItem("buildy_creator_id") || "";
           } catch (_) {
@@ -95,12 +96,9 @@
         const welcomeEl = document.getElementById("dashboard-welcome");
         const agentsEl = document.getElementById("dashboard-agents");
 
-        if (!creatorId) {
-          pleaseRegister.style.display = "block";
-          return;
-        }
-
-        fetch("/api/creators/" + encodeURIComponent(creatorId))
+        function loadDashboard(id) {
+          creatorId = id;
+          fetch("/api/creators/" + encodeURIComponent(creatorId))
           .then((r) => (r.ok ? r.json() : Promise.reject(r)))
           .then((data) => {
             content.style.display = "block";
@@ -192,6 +190,39 @@
             pleaseRegister.style.display = "block";
             pleaseRegister.innerHTML = "<h1>クリエイターダッシュボード</h1><p>登録情報の取得に失敗しました。再度<a href=\"./creators-register.html\">クリエイター登録</a>をするか、しばらく経ってからアクセスしてください。</p>";
           });
+        }
+
+        if (creatorId) {
+          loadDashboard(creatorId);
+        } else {
+          fetch("/api/config")
+            .then(function (r) { return r.json(); })
+            .then(function (config) {
+              if (!config.supabaseUrl || !config.supabaseAnonKey) {
+                pleaseRegister.style.display = "block";
+                return;
+              }
+              var supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+              return supabase.auth.getSession().then(function (res) {
+                var session = res.data && res.data.session;
+                if (!session || !session.access_token) {
+                  pleaseRegister.style.display = "block";
+                  return;
+                }
+                return fetch("/api/creators/me", { headers: { Authorization: "Bearer " + session.access_token } })
+                  .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+                  .then(function (data) {
+                    if (data.creator && data.creator.id) {
+                      try { localStorage.setItem("buildy_creator_id", data.creator.id); } catch (_) {}
+                      loadDashboard(data.creator.id);
+                    } else {
+                      pleaseRegister.style.display = "block";
+                    }
+                  });
+              });
+            })
+            .catch(function () { pleaseRegister.style.display = "block"; });
+        }
 
         function escapeHtml(s) {
           const div = document.createElement("div");

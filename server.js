@@ -151,6 +151,31 @@ app.post("/api/agents/:id/run", async (req, res) => {
   });
 });
 
+// 購入者「自分」を JWT から取得・作成（Google 等 OAuth 後の同期用）
+app.get("/api/users/me", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return res.status(401).json({ error: "Authorization required" });
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !user) return res.status(401).json({ error: "Invalid or expired token" });
+  const meta = user.user_metadata || {};
+  const name = [meta.full_name, meta.name, meta.user_name].find(Boolean);
+  const nameStr = (name ? String(name).trim() : null) || user.email || "";
+  const email = user.email || "";
+  const { data: existing } = await supabase.from("users").select("id, email, name").eq("id", user.id).single();
+  if (existing) {
+    return res.json({ user: existing });
+  }
+  const { data: created, error: insertError } = await supabase
+    .from("users")
+    .insert({ id: user.id, email, name: nameStr || null })
+    .select("id, email, name")
+    .single();
+  if (insertError) return res.status(400).json({ error: insertError.message });
+  res.json({ user: created });
+});
+
 // 購入者ログイン（メールで作成 or 取得）
 app.post("/api/users/login", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
@@ -204,7 +229,42 @@ app.get("/api/users/:id/agents", async (req, res) => {
   res.json({ user: user || null, agents });
 });
 
-// クリエイター登録
+// クライアント用設定（メール認証時に Supabase Auth を使う場合）
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+app.get("/api/config", (_req, res) => {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  res.json({
+    supabaseUrl: url || "",
+    supabaseAnonKey: supabaseAnonKey || "",
+  });
+});
+
+// クリエイター「自分」を JWT から取得・作成（メール認証後の同期用）
+app.get("/api/creators/me", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return res.status(401).json({ error: "Authorization required" });
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !user) return res.status(401).json({ error: "Invalid or expired token" });
+  const meta = user.user_metadata || {};
+  const name = [meta.full_name, meta.name, meta.user_name].find(Boolean);
+  const nameStr = (name ? String(name).trim() : null) || user.email || "クリエイター";
+  const email = user.email || "";
+  const { data: existing } = await supabase.from("creators").select("id, name, email").eq("id", user.id).single();
+  if (existing) {
+    return res.json({ creator: existing });
+  }
+  const { data: created, error: insertError } = await supabase
+    .from("creators")
+    .insert({ id: user.id, name: nameStr, email })
+    .select("id, name, email")
+    .single();
+  if (insertError) return res.status(400).json({ error: insertError.message });
+  res.json({ creator: created });
+});
+
+// クリエイター登録（メール認証なし・従来方式。anon key 未設定時やフォールバック用）
 app.post("/api/creators/register", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
   const { name, email } = req.body || {};

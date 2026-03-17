@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>認証中… | Buildy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="page-main">
+        <p id="auth-status">認証を確認しています…</p>
+        <p id="auth-error" style="display: none; color: #c00;"></p>
+      </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script>
+      (function () {
+        var statusEl = document.getElementById("auth-status");
+        var errorEl = document.getElementById("auth-error");
+        function showError(msg) {
+          statusEl.style.display = "none";
+          errorEl.style.display = "block";
+          errorEl.textContent = msg;
+        }
+        function parseFragment() {
+          var hash = window.location.hash.slice(1);
+          var params = {};
+          hash.split("&").forEach(function (p) {
+            var kv = p.split("=");
+            if (kv.length >= 2) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv.slice(1).join("="));
+          });
+          return params;
+        }
+        function parseQuery() {
+          var q = window.location.search.slice(1);
+          var params = {};
+          q.split("&").forEach(function (p) {
+            var kv = p.split("=");
+            if (kv.length >= 2) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv.slice(1).join("="));
+          });
+          return params;
+        }
+        fetch("/api/config")
+          .then(function (r) { return r.json(); })
+          .then(function (config) {
+            if (!config.supabaseUrl || !config.supabaseAnonKey) {
+              showError("メール認証が有効になっていません。");
+              return;
+            }
+            var supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+            var hashParams = parseFragment();
+            var queryParams = parseQuery();
+            var accessToken = hashParams.access_token || queryParams.access_token;
+            var refreshToken = hashParams.refresh_token || queryParams.refresh_token;
+            var tokenHash = hashParams.token_hash || queryParams.token_hash;
+            var type = (hashParams.type || queryParams.type || "signup").toLowerCase();
+            var nextDest = (queryParams.next || hashParams.next || "").toLowerCase();
+
+            function onSession(session) {
+              if (!session || !session.access_token) {
+                showError("セッションの取得に失敗しました。");
+                return;
+              }
+              var isUser = nextDest === "user";
+              var apiUrl = isUser ? "/api/users/me" : "/api/creators/me";
+              var storageKey = isUser ? "buildy_user_id" : "buildy_creator_id";
+              var dataKey = isUser ? "user" : "creator";
+              var redirectTo = isUser ? "./mypage.html" : "./creator-dashboard.html?registered=1";
+              fetch(apiUrl, {
+                headers: { Authorization: "Bearer " + session.access_token },
+              })
+                .then(function (r) {
+                  if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || "同期に失敗"); });
+                  return r.json();
+                })
+                .then(function (data) {
+                  var entity = data[dataKey];
+                  if (entity && entity.id) {
+                    try { localStorage.setItem(storageKey, entity.id); } catch (_) {}
+                  }
+                  window.location.replace(redirectTo);
+                })
+                .catch(function (err) {
+                  showError(err.message || "情報の同期に失敗しました。");
+                });
+            }
+
+            if (accessToken && refreshToken) {
+              supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+                .then(function (_ref) { return _ref.data.session; })
+                .then(onSession)
+                .catch(function (err) {
+                  showError(err.message || "セッションの設定に失敗しました。");
+                });
+              return;
+            }
+            if (tokenHash) {
+              supabase.auth.verifyOtp({ token_hash: tokenHash, type: type })
+                .then(function (res) { return res.data.session; })
+                .then(onSession)
+                .catch(function (err) {
+                  showError(err.message || "メール確認の検証に失敗しました。");
+                });
+              return;
+            }
+            var code = queryParams.code || hashParams.code;
+            if (code) {
+              supabase.auth.exchangeCodeForSession(code)
+                .then(function (res) { return res.data.session; })
+                .then(onSession)
+                .catch(function (err) {
+                  showError(err.message || "ログインの完了に失敗しました。");
+                });
+              return;
+            }
+            showError("認証情報が見つかりません。メールのリンクまたはログインから再度お試しください。");
+          })
+          .catch(function () {
+            showError("設定の取得に失敗しました。");
+          });
+      })();
+    </script>
+  </body>
+</html>
