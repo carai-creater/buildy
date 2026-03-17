@@ -18,6 +18,7 @@ create table if not exists public.agents (
   price_per_run int default 0,
   hero boolean default false,
   system_prompt text not null default 'You are a helpful assistant.',
+  github_repo text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

@@ -39,9 +39,10 @@ Buildy でクリエイター登録・エージェント一覧を使うには、S
 2. **New query** で新規クエリを作成する。
 3. リポジトリの次のファイルの内容をコピーして実行する:
    - `docs/supabase-agents.sql` … `creators` と `agents` テーブルを作成
+   - `docs/supabase-users.sql` … **マイページ（利用者）ログイン用**の `users` と `runs` テーブルを作成（メール/Google ログインを使う場合は必須）
    - （別ファイルで）`docs/supabase-creators.sql` は `supabase-agents.sql` に含まれているため不要
 
-実行後、**Table Editor** で `creators` と `agents` ができていればOKです。
+実行後、**Table Editor** で `creators` と `agents` ができていればOKです。マイページの「ログインできない」エラーが出る場合は、`supabase-users.sql` が未実行の可能性が高いので、上記のとおり実行してください。
 
 ---
 
@@ -64,4 +65,4 @@ Buildy でクリエイター登録・エージェント一覧を使うには、S
 ## 参考
 
 - [Supabase ドキュメント](https://supabase.com/docs)
-- テーブル定義: `docs/supabase-agents.sql` / `docs/supabase-creators.sql`
+- テーブル定義: `docs/supabase-agents.sql` / `docs/supabase-users.sql`

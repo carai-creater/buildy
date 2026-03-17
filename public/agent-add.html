@@ -19,7 +19,16 @@
       </header>
       <section class="page-main">
         <h1>エージェントを追加</h1>
-        <p class="page-lead">新しいAIエージェントをマーケットに登録します。先に<a href="./creators-register.html">クリエイター登録</a>が必要です。</p>
+        <p class="page-lead">新しいAIエージェントをマーケットに登録します。先に<a href="./creators-register.html">クリエイター登録</a>が必要です。GitHub のリポジトリから情報を取得してフォームを埋めることもできます。</p>
+        <div class="page-form" style="max-width: 32rem; margin-bottom: 1.5rem;">
+          <h2 style="font-size: 1rem; margin-bottom: 0.5rem;">GitHub から取り込む（任意）</h2>
+          <label for="github-repo">GitHub リポジトリ URL または owner/repo</label>
+          <div style="display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap;">
+            <input id="github-repo" type="text" placeholder="https://github.com/owner/repo または owner/repo" style="flex: 1; min-width: 12rem;" />
+            <button type="button" id="github-fetch-btn" class="btn primary-btn">リポジトリ情報を取得</button>
+          </div>
+          <p id="github-fetch-result" style="margin-top: 0.5rem; font-size: 14px; color: var(--text-sub);"></p>
+        </div>
         <form id="agent-form" class="page-form" style="max-width: 32rem;">
           <label for="name">エージェント名 *</label>
           <input id="name" name="name" type="text" required placeholder="例: 市場調査エージェント" />
@@ -33,6 +42,7 @@
           <textarea id="system_prompt" name="system_prompt" rows="4" placeholder="You are a helpful assistant. ..."></textarea>
           <label for="creator_id">クリエイターID（登録後に表示されたIDを貼り付け）</label>
           <input id="creator_id" name="creator_id" type="text" placeholder="uuid" />
+          <input id="github_repo" name="github_repo" type="hidden" />
           <button type="submit" class="btn primary-btn">追加する</button>
         </form>
         <p id="agent-result" style="margin-top: 1rem;"></p>
@@ -43,6 +53,44 @@
         const saved = localStorage.getItem("buildy_creator_id");
         if (saved) document.getElementById("creator_id").placeholder = saved;
       } catch (_) {}
+      const githubRepoInput = document.getElementById("github-repo");
+      const githubFetchBtn = document.getElementById("github-fetch-btn");
+      const githubFetchResult = document.getElementById("github-fetch-result");
+      const hiddenGithubRepo = document.getElementById("github_repo");
+      if (githubFetchBtn && githubRepoInput) {
+        githubFetchBtn.addEventListener("click", function () {
+          const url = githubRepoInput.value.trim();
+          if (!url) {
+            githubFetchResult.textContent = "URL または owner/repo を入力してください。";
+            return;
+          }
+          githubFetchResult.textContent = "取得中…";
+          githubFetchBtn.disabled = true;
+          const q = "url=" + encodeURIComponent(url);
+          fetch("/api/github/repo?" + q)
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+            .then(function (_) {
+              var r = _.ok ? null : _.data;
+              if (r && r.error) {
+                githubFetchResult.textContent = "エラー: " + r.error;
+                githubFetchResult.style.color = "#c00";
+                return;
+              }
+              var d = _.data;
+              if (d.name) document.getElementById("name").value = d.name;
+              if (d.description) document.getElementById("shortDescription").value = d.description;
+              if (d.full_name) hiddenGithubRepo.value = d.full_name;
+              else if (d.html_url) hiddenGithubRepo.value = d.html_url;
+              githubFetchResult.textContent = "取得しました: " + (d.full_name || d.name);
+              githubFetchResult.style.color = "";
+            })
+            .catch(function () {
+              githubFetchResult.textContent = "通信エラーです。";
+              githubFetchResult.style.color = "#c00";
+            })
+            .finally(function () { githubFetchBtn.disabled = false; });
+        });
+      }
       document.getElementById("agent-form").addEventListener("submit", function (e) {
         e.preventDefault();
         const creatorId = document.getElementById("creator_id").value.trim() || undefined;
@@ -53,6 +101,7 @@
           pricePerRun: parseInt(document.getElementById("pricePerRun").value, 10) || 0,
           system_prompt: document.getElementById("system_prompt").value.trim() || undefined,
           creator_id: creatorId || undefined,
+          github_repo: (hiddenGithubRepo && hiddenGithubRepo.value) ? hiddenGithubRepo.value.trim() : undefined,
         };
         const resultEl = document.getElementById("agent-result");
         resultEl.textContent = "追加中…";

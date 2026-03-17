@@ -186,12 +186,24 @@ app.post("/api/users/login", async (req, res) => {
     return res.status(400).json({ error: "email is required" });
   }
   const emailTrim = email.trim();
-  const { data: existing } = await supabase.from("users").select("id, email, name").eq("email", emailTrim).single();
+  const { data: existing, error: selectError } = await supabase.from("users").select("id, email, name").eq("email", emailTrim).single();
+  if (selectError && /schema cache|could not find the table|relation.*does not exist/i.test(selectError.message)) {
+    return res.status(503).json({
+      error: "利用者ログインには public.users テーブルが必要です。Supabase の SQL Editor で docs/supabase-users.sql を実行してテーブルを作成してください。",
+    });
+  }
   if (existing) {
     return res.json({ user: existing });
   }
   const { data: created, error } = await supabase.from("users").insert({ email: emailTrim }).select("id, email, name").single();
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) {
+    if (/schema cache|could not find the table|relation.*does not exist/i.test(error.message)) {
+      return res.status(503).json({
+        error: "利用者ログインには public.users テーブルが必要です。Supabase の SQL Editor で docs/supabase-users.sql を実行してテーブルを作成してください。",
+      });
+    }
+    return res.status(400).json({ error: error.message });
+  }
   res.status(201).json({ user: created });
 });
 
@@ -300,10 +312,29 @@ app.get("/api/creators/:id", async (req, res) => {
     pricePerRun: r.price_per_run ?? 0,
     createdAt: r.created_at,
   }));
-  // 収益は将来的に runs テーブルから集計。現状は 0
-  const totalRuns = 0;
-  const totalEarnings = 0;
-  res.json({ creator, agents, earnings: { totalRuns, totalEarnings } });
+  const agentIds = agents.map((a) => a.id);
+  let totalRuns = 0;
+  let totalEarnings = 0;
+  const byAgent = agents.map((a) => ({ agentId: a.id, agentName: a.name, pricePerRun: a.pricePerRun, runs: 0, earnings: 0 }));
+  const byAgentId = Object.fromEntries(byAgent.map((b) => [b.agentId, b]));
+  if (agentIds.length > 0) {
+    const { data: runRows } = await supabase
+      .from("runs")
+      .select("agent_id")
+      .in("agent_id", agentIds);
+    if (runRows && runRows.length > 0) {
+      runRows.forEach((r) => {
+        const row = byAgentId[r.agent_id];
+        if (row) {
+          row.runs += 1;
+          row.earnings += row.pricePerRun;
+          totalRuns += 1;
+          totalEarnings += row.pricePerRun;
+        }
+      });
+    }
+  }
+  res.json({ creator, agents, earnings: { totalRuns, totalEarnings, byAgent } });
 });
 
 // プロフィール更新（表示名・メール）
@@ -325,12 +356,46 @@ app.patch("/api/creators/:id", async (req, res) => {
   res.json({ creator: data });
 });
 
+// GitHub リポジトリ情報取得（公開リポのみ・未認証で 60 req/h 制限あり）
+app.get("/api/github/repo", async (req, res) => {
+  const url = (req.query.url || req.query.repo || "").toString().trim();
+  let ownerRepo = url;
+  if (url.startsWith("https://github.com/")) {
+    ownerRepo = url.replace(/^https:\/\/github\.com\/?/, "").replace(/\/$/, "").split("/").slice(0, 2).join("/");
+  } else if (url.startsWith("http")) {
+    return res.status(400).json({ error: "GitHub の URL を入力してください（https://github.com/owner/repo）" });
+  }
+  if (!ownerRepo || !ownerRepo.includes("/")) {
+    return res.status(400).json({ error: "リポジトリを「owner/repo」または「https://github.com/owner/repo」で指定してください" });
+  }
+  try {
+    const ghRes = await fetch(`https://api.github.com/repos/${ownerRepo}`, {
+      headers: { Accept: "application/vnd.github.v3+json" },
+    });
+    if (!ghRes.ok) {
+      const t = await ghRes.text();
+      if (ghRes.status === 404) return res.status(404).json({ error: "リポジトリが見つかりません（非公開の場合は公開にしてください）" });
+      return res.status(ghRes.status).json({ error: t || "GitHub API エラー" });
+    }
+    const repo = await ghRes.json();
+    res.json({
+      name: repo.name || "",
+      description: repo.description || "",
+      full_name: repo.full_name || ownerRepo,
+      html_url: repo.html_url || `https://github.com/${ownerRepo}`,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message || "取得に失敗しました" });
+  }
+});
+
 // エージェント追加（クリエイター登録済みの id を creator_id に指定）
 app.post("/api/agents", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
-  const { name, category, shortDescription, pricePerRun, system_prompt, creator_id } = req.body || {};
+  const { name, category, shortDescription, pricePerRun, system_prompt, creator_id, github_repo } = req.body || {};
   if (!name || typeof name !== "string") return res.status(400).json({ error: "name is required" });
   const id = `agent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const githubRepoVal = github_repo && typeof github_repo === "string" ? github_repo.trim() || null : null;
   const row = {
     id,
     name: name.trim(),
@@ -340,8 +405,14 @@ app.post("/api/agents", async (req, res) => {
     system_prompt: system_prompt && typeof system_prompt === "string" ? system_prompt.trim() : "You are a helpful assistant.",
     creator_id: creator_id || null,
   };
-  const { data, error } = await supabase.from("agents").insert(row).select("id, name, category, short_description, price_per_run").single();
-  if (error) return res.status(400).json({ error: error.message });
+  if (githubRepoVal) row.github_repo = githubRepoVal;
+  let result = await supabase.from("agents").insert(row).select("id, name, category, short_description, price_per_run").single();
+  if (result.error && githubRepoVal && /github_repo|column.*does not exist/i.test(result.error.message)) {
+    delete row.github_repo;
+    result = await supabase.from("agents").insert(row).select("id, name, category, short_description, price_per_run").single();
+  }
+  if (result.error) return res.status(400).json({ error: result.error.message });
+  const data = result.data;
   res.status(201).json({ agent: { id: data.id, name: data.name, category: data.category, shortDescription: data.short_description, pricePerRun: data.price_per_run } });
 });
 

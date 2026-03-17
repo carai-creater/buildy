@@ -1,5 +1,6 @@
 -- 購入者（ユーザー）と利用履歴用テーブル（Supabase SQL Editor で実行）
--- 先に docs/supabase-creators.sql と docs/supabase-agents.sql で agents を作成してください。
+-- マイページ（利用者）のメール/Google ログインにはこのファイルの実行が必須です。
+-- 先に docs/supabase-agents.sql で creators と agents を作成してください。
 
 create table if not exists public.users (
   id uuid primary key default gen_random_uuid(),
