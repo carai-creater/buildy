@@ -78,10 +78,13 @@ const agents = [
 
 app.use(express.static(__dirname));
 app.use(express.static(path.join(__dirname, "..")));
+// Vercel の api 関数バンドル内の静的ファイル（api/static/ に配置）
+const apiStatic = path.join(__dirname, "api", "static");
+app.use(express.static(apiStatic));
 
 // Vercel では static が index を見つけられないことがあるため GET / を明示的に処理
 app.get("/", (req, res, next) => {
-  const roots = [__dirname, path.join(__dirname, ".."), process.cwd()];
+  const roots = [apiStatic, __dirname, path.join(__dirname, ".."), process.cwd()];
   const tried = roots.map((root) => {
     const p = path.join(root, "index.html");
     return { root, p, exists: fs.existsSync(p) };
@@ -103,6 +106,12 @@ app.get("/", (req, res, next) => {
   for (const { p, exists } of tried) {
     if (exists) return res.sendFile(p);
   }
+  next();
+});
+
+app.get("/index.html", (req, res, next) => {
+  const p = path.join(apiStatic, "index.html");
+  if (fs.existsSync(p)) return res.sendFile(p);
   next();
 });
 
