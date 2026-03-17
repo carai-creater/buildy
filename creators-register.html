@@ -39,7 +39,7 @@
             <button type="submit" class="btn primary-btn">登録する</button>
           </form>
         </div>
-        <div id="register-no-auth" style="display: none;">
+        <div id="register-no-auth">
           <form id="register-form" class="page-form" style="max-width: 28rem;">
             <label for="name2">表示名</label>
             <input id="name2" name="name" type="text" required placeholder="山田 太郎" />
@@ -64,6 +64,7 @@
           .then(function (r) { return r.json(); })
           .then(function (config) {
             if (config.supabaseUrl && config.supabaseAnonKey) {
+              noAuth.style.display = "none";
               withAuth.style.display = "block";
               var redirectTo = window.location.origin + (window.location.pathname.replace(/[^/]+$/, "") || "/") + "auth-callback.html";
               var supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
@@ -129,7 +130,6 @@
                 });
               }
             } else {
-              noAuth.style.display = "block";
               if (!form || !resultEl) return;
               form.addEventListener("submit", function (e) {
                 e.preventDefault();
@@ -172,7 +172,6 @@
             }
           })
           .catch(function () {
-            noAuth.style.display = "block";
             if (form) {
               form.addEventListener("submit", function (e) {
                 e.preventDefault();
