@@ -13,6 +13,7 @@
         <nav class="page-nav">
           <a href="./index.html">トップ</a>
           <a href="./agents.html">エージェント</a>
+          <a href="./creator-dashboard.html">ダッシュボード</a>
           <a href="./agent-add.html">エージェントを追加</a>
         </nav>
       </header>
@@ -44,10 +45,11 @@
           .then((r) => r.json())
           .then((data) => {
             if (data.creator) {
-              resultEl.textContent = "登録しました。ID: " + data.creator.id + "（エージェント追加時に使用します）";
               try {
                 localStorage.setItem("buildy_creator_id", data.creator.id);
               } catch (_) {}
+              window.location.href = "./creator-dashboard.html";
+              return;
             } else {
               resultEl.textContent = "エラー: " + (data.error || "登録に失敗しました");
             }

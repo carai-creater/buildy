@@ -10,8 +10,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 秘密情報は .env に置かず、Vercel 等の「環境変数」のみから読み込む
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 app.use(express.json());
@@ -119,6 +120,7 @@ app.get("/api/agents/:id", async (req, res) => {
       shortDescription: data.short_description,
       pricePerRun: data.price_per_run,
       hero: data.hero,
+      system_prompt: data.system_prompt,
     },
   });
 });
@@ -157,6 +159,31 @@ app.post("/api/creators/register", async (req, res) => {
   res.status(201).json({ creator: data });
 });
 
+// クリエイター情報とそのエージェント一覧（ダッシュボード用）
+app.get("/api/creators/:id", async (req, res) => {
+  if (!supabase) return res.status(404).json({ error: "Not found" });
+  const { data: creator, error: creatorError } = await supabase
+    .from("creators")
+    .select("id, name, email")
+    .eq("id", req.params.id)
+    .single();
+  if (creatorError || !creator) return res.status(404).json({ error: "Creator not found" });
+  const { data: agentsRows } = await supabase
+    .from("agents")
+    .select("id, name, category, short_description, price_per_run, created_at")
+    .eq("creator_id", req.params.id)
+    .order("created_at", { ascending: false });
+  const agents = (agentsRows || []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    category: r.category || "",
+    shortDescription: r.short_description || "",
+    pricePerRun: r.price_per_run ?? 0,
+    createdAt: r.created_at,
+  }));
+  res.json({ creator, agents });
+});
+
 // エージェント追加（クリエイター登録済みの id を creator_id に指定）
 app.post("/api/agents", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
@@ -175,6 +202,31 @@ app.post("/api/agents", async (req, res) => {
   const { data, error } = await supabase.from("agents").insert(row).select("id, name, category, short_description, price_per_run").single();
   if (error) return res.status(400).json({ error: error.message });
   res.status(201).json({ agent: { id: data.id, name: data.name, category: data.category, shortDescription: data.short_description, pricePerRun: data.price_per_run } });
+});
+
+// エージェント更新
+app.patch("/api/agents/:id", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+  const { name, category, shortDescription, pricePerRun, system_prompt } = req.body || {};
+  const updates = {};
+  if (name !== undefined) updates.name = String(name).trim();
+  if (category !== undefined) updates.category = String(category).trim() || null;
+  if (shortDescription !== undefined) updates.short_description = String(shortDescription).trim() || null;
+  if (pricePerRun !== undefined) updates.price_per_run = typeof pricePerRun === "number" ? pricePerRun : parseInt(pricePerRun, 10) || 0;
+  if (system_prompt !== undefined) updates.system_prompt = String(system_prompt).trim() || "You are a helpful assistant.";
+  updates.updated_at = new Date().toISOString();
+  const { data, error } = await supabase.from("agents").update(updates).eq("id", req.params.id).select("id, name, category, short_description, price_per_run").single();
+  if (error) return res.status(400).json({ error: error.message });
+  if (!data) return res.status(404).json({ error: "Agent not found" });
+  res.json({ agent: { id: data.id, name: data.name, category: data.category, shortDescription: data.short_description, pricePerRun: data.price_per_run } });
+});
+
+// エージェント削除
+app.delete("/api/agents/:id", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+  const { error } = await supabase.from("agents").delete().eq("id", req.params.id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.status(204).send();
 });
 
 app.post("/api/auth/login", (req, res) => {

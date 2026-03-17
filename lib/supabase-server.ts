@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
+// 秘密情報は .env に置かず、デプロイ先の環境変数のみから読み込む
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
-const supabaseServiceKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.warn(

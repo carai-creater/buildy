@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>クリエイターダッシュボード | Buildy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <a href="./index.html" class="page-logo">Buildy</a>
+        <nav class="page-nav">
+          <a href="./index.html">トップ</a>
+          <a href="./agents.html">エージェント一覧</a>
+          <a href="./creator-dashboard.html">ダッシュボード</a>
+          <a href="./agent-add.html">エージェントを追加</a>
+        </nav>
+      </header>
+      <section class="page-main">
+        <div id="dashboard-please-register" class="page-empty" style="display: none;">
+          <h1>クリエイターダッシュボード</h1>
+          <p>ダッシュボードを利用するには、まずクリエイター登録をしてください。</p>
+          <p><a href="./creators-register.html" class="btn primary-btn">クリエイター登録</a></p>
+        </div>
+        <div id="dashboard-content" style="display: none;">
+          <h1>クリエイターダッシュボード</h1>
+          <p id="dashboard-welcome" class="page-lead"></p>
+          <p><a href="./agent-add.html" class="btn primary-btn">＋ エージェントを追加</a></p>
+          <h2 style="margin-top: 2rem;">あなたのエージェント</h2>
+          <div id="dashboard-agents" class="page-card-grid"></div>
+        </div>
+      </section>
+    </main>
+    <script>
+      (function () {
+        const creatorId = (function () {
+          try {
+            return localStorage.getItem("buildy_creator_id") || "";
+          } catch (_) {
+            return "";
+          }
+        })();
+        const pleaseRegister = document.getElementById("dashboard-please-register");
+        const content = document.getElementById("dashboard-content");
+        const welcomeEl = document.getElementById("dashboard-welcome");
+        const agentsEl = document.getElementById("dashboard-agents");
+
+        if (!creatorId) {
+          pleaseRegister.style.display = "block";
+          return;
+        }
+
+        fetch("/api/creators/" + encodeURIComponent(creatorId))
+          .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+          .then((data) => {
+            content.style.display = "block";
+            welcomeEl.textContent = "ようこそ、" + (data.creator ? data.creator.name : "") + " さん。";
+            const agents = data.agents || [];
+            if (agents.length === 0) {
+              agentsEl.innerHTML = '<p class="page-empty">まだエージェントがありません。<a href="./agent-add.html">エージェントを追加</a>してください。</p>';
+              return;
+            }
+            agentsEl.innerHTML = agents
+              .map(
+                (a) => `
+              <article class="page-agent-card">
+                <span class="badge subtle">${escapeHtml(a.category)}</span>
+                <h2>${escapeHtml(a.name)}</h2>
+                <p class="page-agent-desc">${escapeHtml(a.shortDescription)}</p>
+                <p class="page-agent-price">¥${Number(a.pricePerRun)} / 実行</p>
+                <p style="margin-top: 0.75rem;">
+                  <a href="./agent-edit.html?id=${encodeURIComponent(a.id)}" class="btn" style="margin-right: 0.5rem;">編集</a>
+                  <button type="button" class="btn agent-delete-btn" data-id="${escapeHtml(a.id)}">削除</button>
+                </p>
+              </article>
+            `
+              )
+              .join("");
+            agentsEl.querySelectorAll(".agent-delete-btn").forEach((btn) => {
+              btn.addEventListener("click", function () {
+                const id = this.getAttribute("data-id");
+                if (!id || !confirm("このエージェントを削除しますか？")) return;
+                fetch("/api/agents/" + encodeURIComponent(id), { method: "DELETE" }).then((r) => {
+                  if (r.status === 204) location.reload();
+                  else r.json().then((d) => alert(d.error || "削除に失敗しました"));
+                });
+              });
+            });
+          })
+          .catch(() => {
+            pleaseRegister.style.display = "block";
+            pleaseRegister.innerHTML = "<h1>クリエイターダッシュボード</h1><p>登録情報の取得に失敗しました。再度<a href=\"./creators-register.html\">クリエイター登録</a>をするか、しばらく経ってからアクセスしてください。</p>";
+          });
+
+        function escapeHtml(s) {
+          const div = document.createElement("div");
+          div.textContent = s == null ? "" : s;
+          return div.innerHTML;
+        }
+      })();
+    </script>
+  </body>
+</html>

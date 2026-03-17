@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>エージェントを編集 | Buildy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <a href="./index.html" class="page-logo">Buildy</a>
+        <nav class="page-nav">
+          <a href="./index.html">トップ</a>
+          <a href="./agents.html">エージェント一覧</a>
+          <a href="./creator-dashboard.html">ダッシュボード</a>
+          <a href="./agent-add.html">エージェントを追加</a>
+        </nav>
+      </header>
+      <section class="page-main">
+        <h1>エージェントを編集</h1>
+        <p id="edit-loading" class="page-lead">読み込み中…</p>
+        <form id="agent-form" class="page-form" style="max-width: 32rem; display: none;">
+          <label for="name">エージェント名 *</label>
+          <input id="name" name="name" type="text" required />
+          <label for="category">カテゴリ</label>
+          <input id="category" name="category" type="text" />
+          <label for="shortDescription">短い説明</label>
+          <textarea id="shortDescription" name="shortDescription" rows="2"></textarea>
+          <label for="pricePerRun">1実行あたりの料金（円）</label>
+          <input id="pricePerRun" name="pricePerRun" type="number" min="0" />
+          <label for="system_prompt">システムプロンプト（LLM用）</label>
+          <textarea id="system_prompt" name="system_prompt" rows="4"></textarea>
+          <button type="submit" class="btn primary-btn">保存する</button>
+        </form>
+        <p id="agent-result" style="margin-top: 1rem;"></p>
+      </section>
+    </main>
+    <script>
+      (function () {
+        const params = new URLSearchParams(location.search);
+        const id = params.get("id");
+        if (!id) {
+          document.getElementById("edit-loading").textContent = "エージェントIDが指定されていません。";
+          return;
+        }
+        const form = document.getElementById("agent-form");
+        const loadingEl = document.getElementById("edit-loading");
+        const resultEl = document.getElementById("agent-result");
+        fetch("/api/agents/" + encodeURIComponent(id))
+          .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+          .then((data) => {
+            const a = data.agent;
+            if (!a) return Promise.reject(new Error("Not found"));
+            loadingEl.style.display = "none";
+            form.style.display = "block";
+            document.getElementById("name").value = a.name || "";
+            document.getElementById("category").value = a.category || "";
+            document.getElementById("shortDescription").value = a.shortDescription || "";
+            document.getElementById("pricePerRun").value = a.pricePerRun ?? 0;
+            document.getElementById("system_prompt").value = a.system_prompt || "";
+          })
+          .catch(() => {
+            loadingEl.textContent = "エージェントの取得に失敗しました。";
+          });
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+          const payload = {
+            name: document.getElementById("name").value.trim(),
+            category: document.getElementById("category").value.trim() || undefined,
+            shortDescription: document.getElementById("shortDescription").value.trim() || undefined,
+            pricePerRun: parseInt(document.getElementById("pricePerRun").value, 10) || 0,
+            system_prompt: document.getElementById("system_prompt").value.trim() || undefined,
+          };
+          resultEl.textContent = "保存中…";
+          fetch("/api/agents/" + encodeURIComponent(id), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+            .then((r) => r.json())
+            .then((data) => {
+              if (data.agent) {
+                resultEl.innerHTML = "保存しました。→ <a href=\"./creator-dashboard.html\">ダッシュボードへ</a>";
+              } else {
+                resultEl.textContent = "エラー: " + (data.error || "保存に失敗しました");
+              }
+            })
+            .catch(() => {
+              resultEl.textContent = "通信エラーです。";
+            });
+        });
+      })();
+    </script>
+  </body>
+</html>
