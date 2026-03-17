@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>マイページ（利用者） | Buildy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <a href="./index.html" class="page-logo">Buildy</a>
+        <nav class="page-nav">
+          <a href="./index.html">トップ</a>
+          <a href="./agents.html">エージェント一覧</a>
+          <a href="./mypage.html">マイページ</a>
+          <a href="./creators-register.html">クリエイター登録</a>
+          <a href="./creator-dashboard.html">ダッシュボード</a>
+          <a href="./agent-add.html">エージェントを追加</a>
+        </nav>
+      </header>
+      <section class="page-main">
+        <div id="mypage-login" style="display: none;">
+          <h1>マイページ（利用者）</h1>
+          <p class="page-lead">メールアドレスでログインすると、利用したAIエージェントを確認できます。</p>
+          <form id="user-login-form" class="page-form" style="max-width: 28rem;">
+            <label for="user-email">メールアドレス</label>
+            <input id="user-email" name="email" type="email" required placeholder="you@example.com" />
+            <button type="submit" class="btn primary-btn">ログイン</button>
+          </form>
+          <p id="login-result" style="margin-top: 0.75rem; min-height: 1.5em;"></p>
+        </div>
+        <div id="mypage-content" style="display: none;">
+          <h1>マイページ</h1>
+          <p id="mypage-welcome" class="page-lead"></p>
+          <p style="margin-top: 0.5rem;"><button type="button" id="mypage-logout" class="btn">ログアウト</button></p>
+
+          <h2 style="margin-top: 2rem;">利用したAIエージェント</h2>
+          <p class="page-lead">使ったエージェントがここに表示されます。トップページでエージェントを実行すると記録されます。</p>
+          <div id="mypage-agents" class="page-card-grid"></div>
+          <div id="mypage-agents-empty" class="page-empty" style="display: none;">
+            <p>まだ利用したエージェントはありません。</p>
+            <p><a href="./index.html" class="btn primary-btn">エージェントを探す</a> / <a href="./agents.html">エージェント一覧</a></p>
+          </div>
+
+          <p style="margin-top: 2rem;"><a href="./agents.html" class="btn primary-btn">他のエージェントを探す</a></p>
+        </div>
+      </section>
+    </main>
+    <script>
+      (function () {
+        var userId = (function () {
+          try {
+            return localStorage.getItem("buildy_user_id") || "";
+          } catch (_) {
+            return "";
+          }
+        })();
+        var loginBlock = document.getElementById("mypage-login");
+        var contentBlock = document.getElementById("mypage-content");
+        var welcomeEl = document.getElementById("mypage-welcome");
+        var agentsEl = document.getElementById("mypage-agents");
+        var agentsEmpty = document.getElementById("mypage-agents-empty");
+
+        function showLogin() {
+          loginBlock.style.display = "block";
+          contentBlock.style.display = "none";
+        }
+        function showContent() {
+          loginBlock.style.display = "none";
+          contentBlock.style.display = "block";
+        }
+
+        if (!userId) {
+          showLogin();
+          var loginForm = document.getElementById("user-login-form");
+          var loginResult = document.getElementById("login-result");
+          if (loginForm && loginResult) {
+            loginForm.addEventListener("submit", function (e) {
+              e.preventDefault();
+              var email = document.getElementById("user-email").value.trim();
+              if (!email) {
+                loginResult.textContent = "メールアドレスを入力してください。";
+                loginResult.style.color = "#c00";
+                return;
+              }
+              loginResult.textContent = "ログイン中…";
+              loginResult.style.color = "";
+              fetch("/api/users/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email }),
+              })
+                .then(function (r) {
+                  if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || "ログインに失敗しました"); });
+                  return r.json();
+                })
+                .then(function (data) {
+                  if (data.user && data.user.id) {
+                    try {
+                      localStorage.setItem("buildy_user_id", data.user.id);
+                      if (data.user.email) localStorage.setItem("buildy_user_email", data.user.email);
+                    } catch (_) {}
+                    location.reload();
+                  } else {
+                    loginResult.textContent = "エラー: ユーザー情報を取得できませんでした。";
+                    loginResult.style.color = "#c00";
+                  }
+                })
+                .catch(function (err) {
+                  loginResult.textContent = "エラー: " + (err.message || "通信エラー");
+                  loginResult.style.color = "#c00";
+                });
+            });
+          }
+          return;
+        }
+
+        showContent();
+        fetch("/api/users/" + encodeURIComponent(userId) + "/agents")
+          .then(function (r) {
+            if (!r.ok) throw new Error("取得に失敗しました");
+            return r.json();
+          })
+          .then(function (data) {
+            var user = data.user || {};
+            var displayName = user.name || user.email || "ゲスト";
+            welcomeEl.textContent = "ようこそ、" + displayName + " さん。";
+            var agents = data.agents || [];
+            if (agents.length === 0) {
+              agentsEl.innerHTML = "";
+              if (agentsEmpty) agentsEmpty.style.display = "block";
+              return;
+            }
+            if (agentsEmpty) agentsEmpty.style.display = "none";
+            agentsEl.innerHTML = agents
+              .map(function (a) {
+                var name = (a.name || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                var cat = (a.category || "その他").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                var desc = (a.shortDescription || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                var price = Number(a.pricePerRun) || 0;
+                return (
+                  '<article class="page-agent-card">' +
+                  '<span class="badge subtle">' + cat + "</span>" +
+                  "<h2>" + name + "</h2>" +
+                  '<p class="page-agent-desc">' + desc + "</p>" +
+                  '<p class="page-agent-price">¥' + price + " / 実行</p>" +
+                  '<p style="margin-top: 0.75rem;"><a href="./index.html" class="btn primary-btn">使う</a></p>' +
+                  "</article>"
+                );
+              })
+              .join("");
+          })
+          .catch(function () {
+            welcomeEl.textContent = "ようこそ。";
+            if (agentsEmpty) {
+              agentsEmpty.style.display = "block";
+              agentsEmpty.innerHTML = "<p>データの取得に失敗しました。しばらく経ってから再読み込みしてください。</p>";
+            }
+          });
+
+        var logoutBtn = document.getElementById("mypage-logout");
+        if (logoutBtn) {
+          logoutBtn.addEventListener("click", function () {
+            try {
+              localStorage.removeItem("buildy_user_id");
+              localStorage.removeItem("buildy_user_email");
+            } catch (_) {}
+            location.reload();
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

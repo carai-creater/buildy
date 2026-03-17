@@ -131,8 +131,12 @@ app.post("/api/agents/:id/run", async (req, res) => {
     : null;
   if (!agent) return res.status(404).json({ error: "Agent not found" });
 
-  const { query } = req.body || {};
+  const { query, user_id: userId } = req.body || {};
   const safeQuery = typeof query === "string" && query.trim() ? query.trim() : "指定なし";
+  if (supabase && userId && typeof userId === "string") {
+    await supabase.from("runs").insert({ user_id: userId.trim(), agent_id: agent.id });
+  }
+
   res.json({
     runId: `run_${Date.now()}`,
     agentId: agent.id,
@@ -145,6 +149,59 @@ app.post("/api/agents/:id/run", async (req, res) => {
       inputQuery: safeQuery,
     },
   });
+});
+
+// 購入者ログイン（メールで作成 or 取得）
+app.post("/api/users/login", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+  const { email } = req.body || {};
+  if (!email || typeof email !== "string" || !email.trim()) {
+    return res.status(400).json({ error: "email is required" });
+  }
+  const emailTrim = email.trim();
+  const { data: existing } = await supabase.from("users").select("id, email, name").eq("email", emailTrim).single();
+  if (existing) {
+    return res.json({ user: existing });
+  }
+  const { data: created, error } = await supabase.from("users").insert({ email: emailTrim }).select("id, email, name").single();
+  if (error) return res.status(400).json({ error: error.message });
+  res.status(201).json({ user: created });
+});
+
+// 購入者マイページ用：利用したエージェント一覧
+app.get("/api/users/:id/agents", async (req, res) => {
+  if (!supabase) return res.status(404).json({ error: "Not found" });
+  const userId = req.params.id;
+  const { data: runRows } = await supabase
+    .from("runs")
+    .select("agent_id, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (!runRows || runRows.length === 0) {
+    return res.json({ user: null, agents: [] });
+  }
+  const agentIds = [...new Set(runRows.map((r) => r.agent_id))];
+  const { data: agentRows } = await supabase.from("agents").select("id, name, category, short_description, price_per_run").in("id", agentIds);
+  const byId = (agentRows || []).reduce((acc, a) => {
+    acc[a.id] = a;
+    return acc;
+  }, {});
+  const agents = agentIds.map((id) => {
+    const r = runRows.find((x) => x.agent_id === id);
+    const a = byId[id];
+    return a
+      ? {
+          id: a.id,
+          name: a.name,
+          category: a.category || "",
+          shortDescription: a.short_description || "",
+          pricePerRun: a.price_per_run ?? 0,
+          lastUsedAt: r ? r.created_at : null,
+        }
+      : null;
+  }).filter(Boolean);
+  const { data: user } = await supabase.from("users").select("id, email, name").eq("id", userId).single();
+  res.json({ user: user || null, agents });
 });
 
 // クリエイター登録

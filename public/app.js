@@ -24,14 +24,17 @@ async function runHeroAgent() {
         ? queryInput.value.trim()
         : "日本のD2Cコスメ市場の主要プレイヤー";
 
+    var body = { query: query };
+    try {
+      var uid = localStorage.getItem("buildy_user_id");
+      if (uid) body.user_id = uid;
+    } catch (_) {}
     const res = await fetch(`/api/agents/${selectedAgent}/run`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        query,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
