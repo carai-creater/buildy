@@ -150,18 +150,32 @@
                   body: JSON.stringify({ name: name, email: email }),
                 })
                   .then(function (r) {
+                    if (r.status === 201) {
+                      return r.json().then(function (data) {
+                        var creatorId = data && data.creator && data.creator.id;
+                        if (creatorId) {
+                          try { localStorage.setItem("buildy_creator_id", creatorId); } catch (_) {}
+                          var base = window.location.pathname.replace(/[^/]*$/, "") || "/";
+                          if (!base.endsWith("/")) base = base + "/";
+                          window.location.replace(window.location.origin + base + "creator-dashboard.html?registered=1");
+                        } else {
+                          resultEl.textContent = "登録しましたが、ページの取得に失敗しました。";
+                          resultEl.style.color = "#c00";
+                          if (btn) btn.disabled = false;
+                        }
+                      }).catch(function () {
+                        resultEl.textContent = "登録に成功しました。マイページを開いてください。";
+                        resultEl.style.color = "";
+                        if (btn) btn.disabled = false;
+                      });
+                      return;
+                    }
                     if (!r.ok) return r.text().then(function (t) { throw new Error(r.status + " " + t); });
-                    return r.json();
-                  })
-                  .then(function (data) {
-                    if (data.creator) {
-                      try { localStorage.setItem("buildy_creator_id", data.creator.id); } catch (_) {}
-                      window.location.href = "./creator-dashboard.html?registered=1";
-                    } else {
+                    return r.json().then(function (data) {
                       resultEl.textContent = "エラー: " + (data.error || "登録に失敗しました");
                       resultEl.style.color = "#c00";
                       if (btn) btn.disabled = false;
-                    }
+                    });
                   })
                   .catch(function (err) {
                     resultEl.textContent = "通信エラーです。(" + (err.message || "") + ")";
@@ -192,18 +206,32 @@
                   body: JSON.stringify({ name: name, email: email }),
                 })
                   .then(function (r) {
+                    if (r.status === 201) {
+                      return r.json().then(function (data) {
+                        var creatorId = data && data.creator && data.creator.id;
+                        if (creatorId) {
+                          try { localStorage.setItem("buildy_creator_id", creatorId); } catch (_) {}
+                          var base = window.location.pathname.replace(/[^/]*$/, "") || "/";
+                          if (!base.endsWith("/")) base = base + "/";
+                          window.location.replace(window.location.origin + base + "creator-dashboard.html?registered=1");
+                        } else {
+                          resultEl.textContent = "登録しましたが、ページの取得に失敗しました。";
+                          resultEl.style.color = "#c00";
+                          if (btn) btn.disabled = false;
+                        }
+                      }).catch(function () {
+                        resultEl.textContent = "登録に成功しました。マイページを開いてください。";
+                        resultEl.style.color = "";
+                        if (btn) btn.disabled = false;
+                      });
+                      return;
+                    }
                     if (!r.ok) return r.text().then(function (t) { throw new Error(r.status + " " + t); });
-                    return r.json();
-                  })
-                  .then(function (data) {
-                    if (data.creator) {
-                      try { localStorage.setItem("buildy_creator_id", data.creator.id); } catch (_) {}
-                      window.location.href = "./creator-dashboard.html?registered=1";
-                    } else {
+                    return r.json().then(function (data) {
                       resultEl.textContent = "エラー: " + (data.error || "登録に失敗しました");
                       resultEl.style.color = "#c00";
                       if (btn) btn.disabled = false;
-                    }
+                    });
                   })
                   .catch(function (err) {
                     resultEl.textContent = "通信エラーです。(" + (err.message || "") + ")";

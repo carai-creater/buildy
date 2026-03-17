@@ -42,12 +42,14 @@ app.use((req, _res, next) => {
 });
 // #endregion
 
-// Vercel プレビュー用 feedback.js を許可する CSP（script-src-elem を明示しないと default-src でブロックされる）
+// Vercel プレビュー用・Supabase CDN・インラインスクリプトを許可する CSP
 const csp =
   "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; " +
+  "frame-src 'self' https://vercel.live; " +
   "img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com data:; " +
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-  "script-src 'self' https://vercel.live; script-src-elem 'self' https://vercel.live; " +
+  "script-src 'self' 'unsafe-inline' https://vercel.live https://cdn.jsdelivr.net; " +
+  "script-src-elem 'self' 'unsafe-inline' https://vercel.live https://cdn.jsdelivr.net; " +
   "connect-src 'self' https:;";
 app.use((_req, res, next) => {
   res.setHeader("Content-Security-Policy", csp);
