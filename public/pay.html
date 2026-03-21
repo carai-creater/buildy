@@ -168,7 +168,8 @@
                   .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
                   .then(function (x) {
                     if (!x.ok) {
-                      out.textContent = x.j.error || "失敗しました";
+                      var ej = x.j || {};
+                      out.textContent = ej.messageJa || ej.message || ej.error || "失敗しました";
                       out.style.color = "#c00";
                       return;
                     }

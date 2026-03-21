@@ -18,6 +18,17 @@ import { consumeGrantForExecute } from "./lib/consume-grant.js";
 /** Vercel サーバーレスでテーブル未作成時のフォールバック用（本番は Supabase の SQL を実行してください） */
 const tempoIntentMemory = new Map();
 
+/** チェックアウト後トークン署名に必須。未設定時は API が 503 を返す。 */
+function jsonAccessTokenSecretMissing() {
+  return {
+    error: "BUILDY_ACCESS_TOKEN_SECRET is not set",
+    message:
+      "Set BUILDY_ACCESS_TOKEN_SECRET (a long random string) in your deployment environment — e.g. Vercel: Project → Settings → Environment Variables — then redeploy.",
+    messageJa:
+      "環境変数 BUILDY_ACCESS_TOKEN_SECRET（長いランダム文字列）を設定し、再デプロイしてください（例: Vercel の Project → Settings → Environment Variables）。",
+  };
+}
+
 function publicOrigin(req) {
   const envBase = (process.env.BUILDY_PUBLIC_URL || process.env.NEXT_PUBLIC_SITE_URL || "").trim().replace(/\/$/, "");
   if (envBase) return envBase;
@@ -188,10 +199,7 @@ app.post("/api/agent/execute", async (req, res) => {
 
   const secret = process.env.BUILDY_ACCESS_TOKEN_SECRET;
   if (!secret) {
-    return res.status(503).json({
-      error: "config_error",
-      message: "BUILDY_ACCESS_TOKEN_SECRET が未設定です。",
-    });
+    return res.status(503).json(jsonAccessTokenSecretMissing());
   }
 
   try {
@@ -370,10 +378,7 @@ app.post("/api/payments/tempo/verify", async (req, res) => {
 
   const secret = process.env.BUILDY_ACCESS_TOKEN_SECRET;
   if (!secret) {
-    return res.status(503).json({
-      error: "BUILDY_ACCESS_TOKEN_SECRET is not set",
-      message: "アクセストークン署名用の秘密鍵を環境変数に設定してください。",
-    });
+    return res.status(503).json(jsonAccessTokenSecretMissing());
   }
 
   let intent = null;
@@ -473,10 +478,7 @@ app.post("/api/payments/tempo/confirm-free", async (req, res) => {
 
   const secret = process.env.BUILDY_ACCESS_TOKEN_SECRET;
   if (!secret) {
-    return res.status(503).json({
-      error: "BUILDY_ACCESS_TOKEN_SECRET is not set",
-      message: "アクセストークン署名用の秘密鍵を環境変数に設定してください。",
-    });
+    return res.status(503).json(jsonAccessTokenSecretMissing());
   }
 
   let intent = null;
@@ -575,10 +577,7 @@ app.post("/api/payments/stripe/create-checkout-session", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
   const secret = process.env.BUILDY_ACCESS_TOKEN_SECRET;
   if (!secret) {
-    return res.status(503).json({
-      error: "BUILDY_ACCESS_TOKEN_SECRET is not set",
-      message: "アクセストークン署名用の秘密鍵を環境変数に設定してください。",
-    });
+    return res.status(503).json(jsonAccessTokenSecretMissing());
   }
 
   const agentId = (req.body?.agentId || req.body?.agent_id || "").toString().trim();
@@ -648,7 +647,7 @@ app.post("/api/payments/stripe/complete", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
   const secret = process.env.BUILDY_ACCESS_TOKEN_SECRET;
   if (!secret) {
-    return res.status(503).json({ error: "BUILDY_ACCESS_TOKEN_SECRET is not set" });
+    return res.status(503).json(jsonAccessTokenSecretMissing());
   }
 
   try {
