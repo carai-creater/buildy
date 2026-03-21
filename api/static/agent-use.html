@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="page">
+    <main class="page page--agent-use">
       <header class="page-header">
         <a href="./index-ja.html" class="page-logo">Buildy</a>
         <nav class="page-nav">
@@ -15,40 +15,46 @@
           <a href="./agent-use-en.html" class="page-lang">English</a>
         </nav>
       </header>
-      <section class="page-main page-main--narrow">
-        <div id="state-loading" class="page-empty"><p>読み込み中…</p></div>
-        <div id="state-need-pay" class="page-card" style="display: none;">
-          <h1 id="np-title"></h1>
-          <p>
-            無料・有料どちらも、先にチェックアウトページで手続きが必要です（無料はオンチェーン送金なし、有料は Tempo で支払い）。
+      <section class="page-main agent-use-main">
+        <div id="state-loading" class="agent-use-loading"><p>読み込み中…</p></div>
+        <div id="state-need-pay" class="agent-use-card agent-use-card--notice" style="display: none;">
+          <h1 class="agent-use-heading" id="np-title"></h1>
+          <p class="agent-use-muted">このエージェントを使うにはチェックアウトが必要です。</p>
+          <p style="margin-top: 1.25rem;">
+            <a id="np-pay" href="#" class="btn primary-btn">チェックアウトへ</a>
           </p>
-          <p><a id="np-pay" href="#" class="btn primary-btn">チェックアウトへ</a></p>
         </div>
 
-        <div id="ui-wrap-chat" style="display: none;">
-          <h1 id="ch-title"></h1>
-          <p id="ch-sub" class="page-lead" style="font-size: 14px;"></p>
-          <div id="ch-log" class="page-card agent-use-log"></div>
-          <label for="ch-input">メッセージ</label>
-          <textarea id="ch-input" rows="3" style="width: 100%; max-width: 42rem; padding: 0.5rem; margin-top: 0.35rem;"></textarea>
-          <p style="margin-top: 0.75rem;">
-            <button type="button" id="ch-send" class="btn primary-btn">送信</button>
-          </p>
-          <p id="ch-err" class="agent-use-err"></p>
+        <div id="ui-wrap-chat" class="agent-use-workspace" style="display: none;">
+          <header class="agent-use-header">
+            <h1 class="agent-use-heading" id="ch-title"></h1>
+          </header>
+          <div class="agent-use-output-card">
+            <p id="ch-placeholder" class="agent-use-placeholder">ここに応答が表示されます。</p>
+            <div id="ch-log" class="agent-use-output" aria-live="polite"></div>
+          </div>
+          <div class="agent-use-compose">
+            <label class="visually-hidden" for="ch-input">メッセージ</label>
+            <textarea id="ch-input" class="agent-use-textarea" rows="2" placeholder="メッセージを入力…" autocomplete="off"></textarea>
+            <button type="button" id="ch-send" class="btn primary-btn agent-use-send">送信</button>
+          </div>
+          <p id="ch-err" class="agent-use-err" role="alert"></p>
         </div>
 
-        <div id="ui-wrap-research" style="display: none;">
-          <p class="badge accent" style="margin-bottom: 0.5rem;">リサーチ用 UI</p>
-          <h1 id="rs-title"></h1>
-          <p id="rs-sub" class="page-lead agent-use-research-lead"></p>
-          <label for="rs-input">調査テーマ / 質問</label>
-          <textarea id="rs-input" rows="6" class="agent-use-research-input"></textarea>
-          <p style="margin-top: 0.75rem;">
-            <button type="button" id="rs-send" class="btn primary-btn">リサーチを実行</button>
-          </p>
-          <h2 class="agent-use-h2" style="margin-top: 1.5rem; font-size: 1rem;">結果</h2>
-          <div id="rs-log" class="page-card agent-use-research-log"></div>
-          <p id="rs-err" class="agent-use-err"></p>
+        <div id="ui-wrap-research" class="agent-use-workspace" style="display: none;">
+          <header class="agent-use-header">
+            <h1 class="agent-use-heading" id="rs-title"></h1>
+          </header>
+          <div class="agent-use-output-card">
+            <p id="rs-placeholder" class="agent-use-placeholder">ここに結果が表示されます。</p>
+            <div id="rs-log" class="agent-use-output" aria-live="polite"></div>
+          </div>
+          <div class="agent-use-compose">
+            <label class="visually-hidden" for="rs-input">リクエスト</label>
+            <textarea id="rs-input" class="agent-use-textarea agent-use-textarea--tall" rows="4" placeholder="調べてほしい内容…" autocomplete="off"></textarea>
+            <button type="button" id="rs-send" class="btn primary-btn agent-use-send">実行</button>
+          </div>
+          <p id="rs-err" class="agent-use-err" role="alert"></p>
         </div>
       </section>
     </main>
@@ -73,11 +79,9 @@
           }
         }
 
-        function runExecute(userText, logEl, errEl, appendUserPrefix) {
+        function runExecute(userText, logEl, errEl, placeholderEl, sendBtn) {
           errEl.textContent = "";
-          if (appendUserPrefix) {
-            logEl.textContent += "\n\n" + appendUserPrefix + "\n" + userText;
-          }
+          if (sendBtn) sendBtn.disabled = true;
           var token = getToken();
           var headers = { "Content-Type": "application/json" };
           if (token) headers["X-Buildy-Access-Token"] = token;
@@ -100,10 +104,20 @@
                 errEl.textContent = _ref.j.message || _ref.j.error || "実行に失敗しました (HTTP " + _ref.status + ")";
                 return;
               }
-              logEl.textContent += "\n\n【出力】\n" + (_ref.j.content || "");
+              var out = (_ref.j.content || "").trim();
+              if (!out) return;
+              if (placeholderEl) placeholderEl.style.display = "none";
+              if (logEl.textContent.trim()) {
+                logEl.textContent += "\n\n" + out;
+              } else {
+                logEl.textContent = out;
+              }
             })
             .catch(function () {
               errEl.textContent = "通信エラーです。";
+            })
+            .finally(function () {
+              if (sendBtn) sendBtn.disabled = false;
             });
         }
 
@@ -119,8 +133,7 @@
             document.getElementById("state-loading").style.display = "none";
 
             if (!token) {
-              var np = document.getElementById("state-need-pay");
-              np.style.display = "block";
+              document.getElementById("state-need-pay").style.display = "block";
               document.getElementById("np-title").textContent = agent.name;
               document.getElementById("np-pay").href = "./pay.html?agent=" + encodeURIComponent(agentId);
               return;
@@ -128,29 +141,35 @@
 
             var variant = agent.uiVariant || "chat";
             if (variant === "research") {
-              document.getElementById("ui-wrap-research").style.display = "block";
+              document.getElementById("ui-wrap-research").style.display = "flex";
               document.getElementById("rs-title").textContent = agent.name;
-              document.getElementById("rs-sub").textContent =
-                "テーマや質問を入力してください。1 回の実行で利用権を 1 回消費します。表示価格: ¥" +
-                (Number(agent.pricePerRun) || 0) +
-                "（このブラウザではチェックアウト済み）。";
+              var rsBtn = document.getElementById("rs-send");
               document.getElementById("rs-send").addEventListener("click", function () {
                 var text = document.getElementById("rs-input").value.trim();
                 if (!text) return;
-                runExecute(text, document.getElementById("rs-log"), document.getElementById("rs-err"), "【テーマ】");
+                runExecute(
+                  text,
+                  document.getElementById("rs-log"),
+                  document.getElementById("rs-err"),
+                  document.getElementById("rs-placeholder"),
+                  rsBtn
+                );
                 document.getElementById("rs-input").value = "";
               });
             } else {
-              document.getElementById("ui-wrap-chat").style.display = "block";
+              document.getElementById("ui-wrap-chat").style.display = "flex";
               document.getElementById("ch-title").textContent = agent.name;
-              document.getElementById("ch-sub").textContent =
-                "チャット UI · ¥" +
-                (Number(agent.pricePerRun) || 0) +
-                " · メッセージごとにチェックアウトの利用権を 1 回消費します。";
+              var chBtn = document.getElementById("ch-send");
               document.getElementById("ch-send").addEventListener("click", function () {
                 var text = document.getElementById("ch-input").value.trim();
                 if (!text) return;
-                runExecute(text, document.getElementById("ch-log"), document.getElementById("ch-err"), "【あなた】");
+                runExecute(
+                  text,
+                  document.getElementById("ch-log"),
+                  document.getElementById("ch-err"),
+                  document.getElementById("ch-placeholder"),
+                  chBtn
+                );
                 document.getElementById("ch-input").value = "";
               });
             }
