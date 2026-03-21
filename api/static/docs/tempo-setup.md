@@ -1,6 +1,11 @@
 # Tempo 決済（Buildy）
 
-有料エージェントは [Tempo](https://tempo.xyz/) 上の TIP-20（例: pathUSD）と `transferWithMemo` で支払います。**無料エージェントも同じチェックアウト画面**を通り、`POST /api/payments/tempo/confirm-free` で利用権を発行します（オンチェーン送金なし）。
+有料エージェントの支払いは次のいずれかです。
+
+- **推奨（一般ユーザー向け）**: [Stripe Checkout](./stripe-setup.md) で **カード**（`STRIPE_SECRET_KEY` 設定時、チェックアウト画面のボタンから）。
+- **暗号資産向け**: [Tempo](https://tempo.xyz/) 上の TIP-20 と `transferWithMemo`。
+
+**無料エージェント**も同じチェックアウト画面を通り、`POST /api/payments/tempo/confirm-free` で利用権を発行します（オンチェーン送金なし）。
 
 ## 1. Supabase テーブル
 

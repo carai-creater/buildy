@@ -25,7 +25,7 @@
         <p class="page-lead">
           クリエイターが Buildy に公開したエージェントだけが表示されます。有料は
           <a href="https://tempo.xyz/" target="_blank" rel="noopener noreferrer">Tempo</a>
-          で決済します。無料エージェントもチェックアウト画面の完了が必要です。
+          で決済します（カードは Stripe、暗号資産は Tempo）。無料もチェックアウト完了が必要です。
         </p>
 
         <div id="agents-empty" class="page-empty" style="display: none;">
@@ -55,7 +55,7 @@
             <h2>${escapeHtml(a.name)}</h2>
             <p class="page-agent-desc">${escapeHtml(a.shortDescription || "")}</p>
             <p class="page-agent-price">¥${Number(a.pricePerRun) || 0} / 実行</p>
-            <a href="./pay.html?agent=${encodeURIComponent(a.id)}" class="btn primary-btn">Tempoで決済して利用</a>
+            <a href="./pay.html?agent=${encodeURIComponent(a.id)}" class="btn primary-btn">チェックアウトして利用</a>
           </article>
         `
               )

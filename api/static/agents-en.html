@@ -22,7 +22,7 @@
         <p class="page-lead">
           Only creator-published agents are listed. Paid runs use
           <a href="https://tempo.xyz/" target="_blank" rel="noopener noreferrer">Tempo</a>
-          checkout. Free agents still complete checkout (no on-chain payment).
+          checkout: card (Stripe) or crypto (Tempo). Free agents still complete checkout (no charge).
         </p>
 
         <div id="agents-empty" class="page-empty" style="display: none;">
@@ -65,7 +65,7 @@
                   " / run</p>" +
                   '<a href="./pay-en.html?agent=' +
                   encodeURIComponent(a.id) +
-                  '" class="btn primary-btn">Pay with Tempo to use</a>' +
+                  '" class="btn primary-btn">Checkout to use</a>' +
                   "</article>"
                 );
               })

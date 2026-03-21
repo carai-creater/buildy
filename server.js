@@ -5,6 +5,7 @@ import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
+import Stripe from "stripe";
 import {
   getTempoDefaults,
   yenToUsdAtomic,
@@ -16,6 +17,16 @@ import { consumeGrantForExecute } from "./lib/consume-grant.js";
 
 /** Vercel サーバーレスでテーブル未作成時のフォールバック用（本番は Supabase の SQL を実行してください） */
 const tempoIntentMemory = new Map();
+
+function publicOrigin(req) {
+  const envBase = (process.env.BUILDY_PUBLIC_URL || process.env.NEXT_PUBLIC_SITE_URL || "").trim().replace(/\/$/, "");
+  if (envBase) return envBase;
+  const proto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim();
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "localhost:3000")
+    .split(",")[0]
+    .trim();
+  return `${proto}://${host}`;
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -550,6 +561,182 @@ app.post("/api/payments/tempo/confirm-free", async (req, res) => {
     expiresAt: grantExpires,
     usePath: `./agent-use.html?agent=${encodeURIComponent(intent.agent_id)}`,
   });
+});
+
+/** Stripe Checkout（カード等）— 一般ユーザー向けの簡単な支払い */
+app.post("/api/payments/stripe/create-checkout-session", async (req, res) => {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    return res.status(503).json({
+      error: "stripe_not_configured",
+      message: "STRIPE_SECRET_KEY が未設定です。Stripe ダッシュボードでキーを取得し環境変数に設定してください。",
+    });
+  }
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+  const secret = process.env.BUILDY_ACCESS_TOKEN_SECRET;
+  if (!secret) {
+    return res.status(503).json({
+      error: "BUILDY_ACCESS_TOKEN_SECRET is not set",
+      message: "アクセストークン署名用の秘密鍵を環境変数に設定してください。",
+    });
+  }
+
+  const agentId = (req.body?.agentId || req.body?.agent_id || "").toString().trim();
+  const returnPath = req.body?.returnPath === "pay-en.html" ? "pay-en.html" : "pay.html";
+  if (!agentId) return res.status(400).json({ error: "agentId is required" });
+
+  const { data: agent, error: agentErr } = await supabase
+    .from("agents")
+    .select("id, name, short_description, price_per_run, creator_id")
+    .eq("id", agentId)
+    .single();
+  if (agentErr || !agent || !agent.creator_id) {
+    return res.status(404).json({ error: "Agent not found" });
+  }
+  const priceYen = Math.round(Number(agent.price_per_run) || 0);
+  if (priceYen <= 0) {
+    return res.status(400).json({
+      error: "free_agent",
+      message: "無料エージェントは Stripe ではなく画面の無料チェックアウトを使ってください。",
+    });
+  }
+
+  const origin = publicOrigin(req);
+  try {
+    const stripe = new Stripe(key);
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "jpy",
+            unit_amount: priceYen,
+            product_data: {
+              name: `Buildy · ${agent.name}`,
+              description: (agent.short_description || "").slice(0, 450) || undefined,
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: `${origin}/${returnPath}?agent=${encodeURIComponent(agentId)}&paid=stripe&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/${returnPath}?agent=${encodeURIComponent(agentId)}`,
+      metadata: {
+        buildy_agent_id: agentId,
+        buildy_price_jpy: String(priceYen),
+      },
+    });
+    if (!session.url) {
+      return res.status(500).json({ error: "stripe_no_url" });
+    }
+    return res.json({ url: session.url });
+  } catch (e) {
+    console.error("[Buildy Stripe] create session", e);
+    return res.status(500).json({
+      error: "stripe_error",
+      message: e instanceof Error ? e.message : "Stripe session failed",
+    });
+  }
+});
+
+app.post("/api/payments/stripe/complete", async (req, res) => {
+  const key = process.env.STRIPE_SECRET_KEY;
+  const sessionId = (req.body?.sessionId || req.body?.session_id || "").toString().trim();
+  if (!sessionId) return res.status(400).json({ error: "sessionId is required" });
+  if (!key) return res.status(503).json({ error: "stripe_not_configured" });
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+  const secret = process.env.BUILDY_ACCESS_TOKEN_SECRET;
+  if (!secret) {
+    return res.status(503).json({ error: "BUILDY_ACCESS_TOKEN_SECRET is not set" });
+  }
+
+  try {
+    const stripe = new Stripe(key);
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (session.payment_status !== "paid") {
+      return res.status(400).json({ error: "payment_not_completed", message: session.payment_status || "unknown" });
+    }
+
+    const agentId = session.metadata?.buildy_agent_id;
+    const metaPrice = parseInt(session.metadata?.buildy_price_jpy || "", 10);
+    if (!agentId || !Number.isFinite(metaPrice)) {
+      return res.status(400).json({ error: "invalid_session_metadata" });
+    }
+
+    const { data: agent, error: aerr } = await supabase
+      .from("agents")
+      .select("id, price_per_run")
+      .eq("id", agentId)
+      .single();
+    if (aerr || !agent) return res.status(404).json({ error: "Agent not found" });
+    const expected = Math.round(Number(agent.price_per_run) || 0);
+    const paid = session.amount_total;
+    if (paid !== expected || metaPrice !== expected) {
+      return res.status(400).json({ error: "amount_mismatch" });
+    }
+
+    const txHash = `stripe:${sessionId}`;
+    const { data: existing } = await supabase.from("tempo_access_grants").select("id").eq("tx_hash", txHash).maybeSingle();
+
+    let grantId;
+    if (existing?.id) {
+      grantId = existing.id;
+    } else {
+      const grantExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const email = session.customer_details?.email || session.customer_email;
+      const grantRow = {
+        order_id: `stripe_${sessionId.replace(/[^a-zA-Z0-9]/g, "").slice(-16)}`,
+        agent_id: agentId,
+        payer_wallet: email ? `stripe_email:${email}` : "stripe:guest",
+        tx_hash: txHash,
+        amount_usd_atomic: String(paid),
+        runs_remaining: 1,
+        expires_at: grantExpires,
+      };
+      const { data: grant, error: gErr } = await supabase
+        .from("tempo_access_grants")
+        .insert(grantRow)
+        .select("id")
+        .single();
+      if (gErr || !grant) {
+        if (/relation|does not exist/i.test(gErr?.message || "")) {
+          return res.status(503).json({
+            error: "tempo_access_grants missing",
+            message: "Supabase で docs/supabase-tempo-payments.sql を実行してください。",
+          });
+        }
+        if (/duplicate|unique|violates unique constraint/i.test(gErr?.message || "")) {
+          const { data: again } = await supabase.from("tempo_access_grants").select("id").eq("tx_hash", txHash).maybeSingle();
+          if (again?.id) grantId = again.id;
+          else return res.status(409).json({ error: "grant_conflict" });
+        } else {
+          return res.status(400).json({ error: gErr?.message || "failed to save grant" });
+        }
+      } else {
+        grantId = grant.id;
+      }
+    }
+
+    if (!grantId) {
+      return res.status(500).json({ error: "grant_missing" });
+    }
+
+    const expSec = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+    const accessToken = signAccessToken({ grantId, agentId, exp: expSec }, secret);
+    return res.json({
+      ok: true,
+      accessToken,
+      grantId,
+      agentId,
+    });
+  } catch (e) {
+    console.error("[Buildy Stripe] complete", e);
+    return res.status(500).json({
+      error: "stripe_error",
+      message: e instanceof Error ? e.message : "verification failed",
+    });
+  }
 });
 
 app.post("/api/agents/:id/run", async (req, res) => {

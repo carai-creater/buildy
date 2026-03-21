@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pay with Tempo | Buildy</title>
+    <title>Checkout | Buildy</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -16,15 +16,21 @@
         </nav>
       </header>
       <section class="page-main page-main--narrow">
-        <h1>Pay with Tempo</h1>
+        <h1>Checkout</h1>
         <p class="page-lead">
-          Every agent requires checkout on this page. Paid runs settle on
-          <a href="https://tempo.xyz/" target="_blank" rel="noopener noreferrer">Tempo</a>
-          (TIP-20). Free agents confirm checkout here without an on-chain transfer.
+          <strong>Recommended:</strong> pay with a <strong>credit or debit card</strong> (Stripe Checkout — no crypto wallet needed).
+          Or use <a href="https://tempo.xyz/" target="_blank" rel="noopener noreferrer">Tempo</a> stablecoins if you prefer.
+          Free agents complete checkout here without a card charge or on-chain transfer.
         </p>
 
         <div id="state-loading" class="page-empty"><p>Loading…</p></div>
         <div id="state-error" class="page-empty" style="display: none;"></div>
+        <div id="state-stripe-done" class="page-card" style="display: none;">
+          <p><strong>Payment successful.</strong> Your access is unlocked for this browser.</p>
+          <p style="margin-top: 1rem;">
+            <a id="stripe-done-link" href="#" class="btn primary-btn">Open agent</a>
+          </p>
+        </div>
         <div id="state-pay-free" class="page-card" style="display: none;">
           <h2 id="free-agent-name"></h2>
           <p id="free-agent-desc" class="page-agent-desc"></p>
@@ -44,7 +50,16 @@
           <h2 id="agent-name"></h2>
           <p id="agent-desc" class="page-agent-desc"></p>
           <p><strong>List price (JPY)</strong>: ¥<span id="price-yen">0</span></p>
-          <p><strong>Amount (pathUSD, approx.)</strong>: $<span id="price-usd">0</span></p>
+          <p><strong>Amount (pathUSD, approx.)</strong>: $<span id="price-usd">0</span> — only if you pay with Tempo below.</p>
+          <p style="margin-top: 1rem;">
+            <button type="button" id="btn-stripe" class="btn primary-btn">Pay with card (Stripe)</button>
+          </p>
+          <p id="stripe-inline-status" style="font-size: 14px; color: var(--text-sub); min-height: 1.25em;"></p>
+          <p class="page-note" style="font-size: 13px; color: var(--text-sub);">
+            You’ll be redirected to Stripe’s secure checkout (Visa, Mastercard, etc.). Apple Pay / Google Pay may appear when supported by your browser and Stripe settings.
+          </p>
+          <hr style="margin: 1.25rem 0; border: none; border-top: 1px solid var(--border-soft);" />
+          <p style="font-weight: 600; margin: 0 0 0.5rem;">Or pay with Tempo (crypto wallet)</p>
           <p class="page-note" style="font-size: 14px; color: var(--text-sub);">
             Include memo <code id="memo-display"></code> in <code>transferWithMemo</code>. Recipient is Buildy’s wallet.
           </p>
@@ -91,6 +106,35 @@
 
         if (!agentId) {
           showError("Add <code>?agent=AGENT_ID</code> to the URL.");
+          return;
+        }
+
+        if (params.get("paid") === "stripe" && params.get("session_id")) {
+          loading.style.display = "block";
+          fetch("/api/payments/stripe/complete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId: params.get("session_id") }),
+          })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (x) {
+              loading.style.display = "none";
+              if (!x.ok) {
+                showError((x.j && x.j.message) || x.j.error || "Could not confirm card payment.");
+                return;
+              }
+              try {
+                sessionStorage.setItem("buildy_tempo_access_" + agentId, x.j.accessToken);
+              } catch (_) {}
+              history.replaceState({}, "", "pay-en.html?agent=" + encodeURIComponent(agentId));
+              document.getElementById("state-stripe-done").style.display = "block";
+              document.getElementById("stripe-done-link").href =
+                "./agent-use-en.html?agent=" + encodeURIComponent(agentId);
+            })
+            .catch(function () {
+              loading.style.display = "none";
+              showError("Network error confirming payment.");
+            });
           return;
         }
 
@@ -153,6 +197,30 @@
             document.getElementById("chain-id").textContent = String(data.chainId);
             document.getElementById("token-addr").textContent = data.tokenAddress;
             document.getElementById("recv-addr").textContent = data.recipient;
+
+            document.getElementById("btn-stripe").addEventListener("click", function () {
+              var st = document.getElementById("stripe-inline-status");
+              st.textContent = "Redirecting to Stripe…";
+              st.style.color = "var(--text-sub)";
+              fetch("/api/payments/stripe/create-checkout-session", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ agentId: agentId, returnPath: "pay-en.html" }),
+              })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                .then(function (x) {
+                  if (!x.ok) {
+                    st.style.color = "#c00";
+                    st.textContent = (x.j && x.j.message) || x.j.error || "Card payment unavailable.";
+                    return;
+                  }
+                  if (x.j.url) window.location.href = x.j.url;
+                })
+                .catch(function () {
+                  st.style.color = "#c00";
+                  st.textContent = "Network error.";
+                });
+            });
 
             var btnWallet = document.getElementById("btn-wallet");
             var btnPay = document.getElementById("btn-pay");
