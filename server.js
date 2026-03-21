@@ -1,8 +1,10 @@
 import express from "express";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
+import OpenAI from "openai";
 import {
   getTempoDefaults,
   yenToUsdAtomic,
@@ -10,6 +12,7 @@ import {
   verifyTip20TransferWithMemo,
   signAccessToken,
 } from "./lib/tempo-payment.js";
+import { consumeGrantForExecute } from "./lib/consume-grant.js";
 
 /** Vercel サーバーレスでテーブル未作成時のフォールバック用（本番は Supabase の SQL を実行してください） */
 const tempoIntentMemory = new Map();
@@ -130,6 +133,11 @@ app.get("/api/agents/:id", async (req, res) => {
   if (!supabase) return res.status(404).json({ error: "Agent not found" });
   const { data, error } = await supabase.from("agents").select("*").eq("id", req.params.id).single();
   if (error || !data) return res.status(404).json({ error: "Agent not found" });
+  let uiVariant = data.ui_variant;
+  if (!uiVariant && typeof data.name === "string") {
+    if (/research/i.test(data.name)) uiVariant = "research";
+    else uiVariant = "chat";
+  }
   res.json({
     agent: {
       id: data.id,
@@ -139,8 +147,120 @@ app.get("/api/agents/:id", async (req, res) => {
       pricePerRun: data.price_per_run,
       hero: data.hero,
       system_prompt: data.system_prompt,
+      uiVariant: uiVariant || "chat",
     },
   });
+});
+
+/**
+ * LLM 実行（Vercel で /api が Express に集約されるため Next と同じパスをここでも提供）
+ */
+app.post("/api/agent/execute", async (req, res) => {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: "server_error", message: "LLM が設定されていません。" });
+  }
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+
+  const body = req.body || {};
+  const agent_id = typeof body.agent_id === "string" ? body.agent_id.trim() : "";
+  const user_message = typeof body.user_message === "string" ? body.user_message.trim() : "";
+  const bodyMessages = Array.isArray(body.messages) ? body.messages : null;
+  const stream = body.stream !== false;
+  const paymentHeader =
+    (req.headers["x-buildy-access-token"] || req.headers["X-Buildy-Access-Token"] || "").toString().trim() ||
+    (typeof body.payment_access_token === "string" ? body.payment_access_token : "");
+
+  if (!agent_id) {
+    return res.status(400).json({ error: "agent_id_required", message: "agent_id は必須です。" });
+  }
+
+  const secret = process.env.BUILDY_ACCESS_TOKEN_SECRET;
+  if (!secret) {
+    return res.status(503).json({
+      error: "config_error",
+      message: "BUILDY_ACCESS_TOKEN_SECRET が未設定です。",
+    });
+  }
+
+  try {
+    const { data: agent, error: agentError } = await supabase
+      .from("agents")
+      .select("id, system_prompt, creator_id, price_per_run")
+      .eq("id", agent_id)
+      .single();
+
+    if (agentError || !agent || !agent.creator_id) {
+      return res.status(404).json({
+        error: "agent_not_found",
+        message: "指定されたエージェントが見つかりません。",
+      });
+    }
+
+    const grantCheck = await consumeGrantForExecute(supabase, agent_id, paymentHeader, secret);
+    if (!grantCheck.ok) {
+      return res.status(grantCheck.status).json({
+        error: "payment_required",
+        message: grantCheck.message,
+      });
+    }
+
+    const systemPrompt = (agent.system_prompt && String(agent.system_prompt)) || "You are a helpful assistant.";
+    let messages = [];
+    if (bodyMessages && bodyMessages.length > 0) {
+      messages = bodyMessages;
+    } else if (user_message) {
+      messages = [{ role: "user", content: user_message }];
+    } else {
+      return res.status(400).json({
+        error: "messages_required",
+        message: "messages または user_message を送信してください。",
+      });
+    }
+
+    const openaiMessages = [{ role: "system", content: systemPrompt }, ...messages];
+    const openai = new OpenAI({ apiKey });
+
+    if (stream) {
+      const s = await openai.chat.completions.create({
+        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+        messages: openaiMessages,
+        stream: true,
+      });
+      res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+      res.setHeader("Connection", "keep-alive");
+      try {
+        for await (const chunk of s) {
+          const delta = chunk.choices?.[0]?.delta?.content;
+          if (delta) {
+            res.write(`data: ${JSON.stringify({ text: delta })}\n\n`);
+          }
+        }
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      } catch (e) {
+        console.error("[Buildy execute] stream error", e);
+        res.write(
+          `data: ${JSON.stringify({ error: "stream_error", message: "ストリーム中にエラーが発生しました。" })}\n\n`
+        );
+      }
+      return res.end();
+    }
+
+    const completion = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      messages: openaiMessages,
+      stream: false,
+    });
+    const content = completion.choices?.[0]?.message?.content ?? "";
+    return res.json({ content, conversation_id: body.conversation_id });
+  } catch (err) {
+    console.error("[Buildy execute]", err);
+    return res.status(500).json({
+      error: "execution_failed",
+      message: err instanceof Error ? err.message : "エージェント実行に失敗しました。",
+    });
+  }
 });
 
 // --- Tempo 決済（TIP-20 transferWithMemo）: https://tempo.xyz/
@@ -159,28 +279,28 @@ app.post("/api/payments/tempo/intent", async (req, res) => {
   }
 
   const priceYen = Number(agent.price_per_run) || 0;
-  if (priceYen <= 0) {
-    return res.json({
-      free: true,
-      agent: {
-        id: agent.id,
-        name: agent.name,
-        shortDescription: agent.short_description || "",
-        pricePerRunYen: 0,
-      },
-      message: "このエージェントは無料です。一覧からそのまま利用ページへ進めます。",
-    });
-  }
-
   const cfg = getTempoDefaults();
-  if (!cfg.receiver) {
-    return res.status(503).json({
-      error: "BUILDY_TEMPO_RECEIVER is not set",
-      message: "決済先ウォレットが未設定です。環境変数 BUILDY_TEMPO_RECEIVER を設定してください。",
-    });
+  let checkoutKind;
+  let atomic;
+  let usd;
+
+  if (priceYen <= 0) {
+    checkoutKind = "free";
+    atomic = "0";
+    usd = 0;
+  } else {
+    checkoutKind = "tempo";
+    if (!cfg.receiver) {
+      return res.status(503).json({
+        error: "BUILDY_TEMPO_RECEIVER is not set",
+        message: "決済先ウォレットが未設定です。環境変数 BUILDY_TEMPO_RECEIVER を設定してください。",
+      });
+    }
+    const conv = yenToUsdAtomic(priceYen);
+    atomic = conv.atomic;
+    usd = conv.usd;
   }
 
-  const { usd, atomic } = yenToUsdAtomic(priceYen);
   const orderId = randomOrderId();
   const memoLabel = `by-${orderId}`;
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
@@ -206,14 +326,14 @@ app.post("/api/payments/tempo/intent", async (req, res) => {
   }
 
   res.json({
-    free: false,
+    checkoutKind,
     orderId,
     memoLabel,
     amountUsd: usd,
     amountAtomic: atomic,
     decimals: 6,
-    tokenAddress: cfg.tokenAddress,
-    recipient: cfg.receiver,
+    tokenAddress: checkoutKind === "tempo" ? cfg.tokenAddress : null,
+    recipient: checkoutKind === "tempo" ? cfg.receiver : null,
     chainId: cfg.chainId,
     rpcUrl: cfg.rpcUrl,
     explorerUrl: cfg.explorerBase,
@@ -329,6 +449,104 @@ app.post("/api/payments/tempo/verify", async (req, res) => {
     grantId,
     agentId: intent.agent_id,
     payerWallet: v.from,
+    expiresAt: grantExpires,
+    usePath: `./agent-use.html?agent=${encodeURIComponent(intent.agent_id)}`,
+  });
+});
+
+/** 無料エージェントも「チェックアウト」通過用（オンチェーン送金なしで grant 発行） */
+app.post("/api/payments/tempo/confirm-free", async (req, res) => {
+  const orderId = (req.body?.orderId || req.body?.order_id || "").toString().trim();
+  if (!orderId) return res.status(400).json({ error: "orderId is required" });
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+
+  const secret = process.env.BUILDY_ACCESS_TOKEN_SECRET;
+  if (!secret) {
+    return res.status(503).json({
+      error: "BUILDY_ACCESS_TOKEN_SECRET is not set",
+      message: "アクセストークン署名用の秘密鍵を環境変数に設定してください。",
+    });
+  }
+
+  let intent = null;
+  const { data: intentRow, error: intentErr } = await supabase
+    .from("tempo_payment_intents")
+    .select("*")
+    .eq("order_id", orderId)
+    .maybeSingle();
+
+  if (!intentErr && intentRow) {
+    intent = intentRow;
+  } else {
+    const mem = tempoIntentMemory.get(orderId);
+    if (mem) {
+      intent = {
+        order_id: mem.order_id,
+        agent_id: mem.agent_id,
+        amount_usd_atomic: mem.amount_usd_atomic,
+        memo_label: mem.memo_label,
+        expires_at: mem.expires_at,
+      };
+    }
+  }
+
+  if (!intent) return res.status(404).json({ error: "order not found or expired" });
+  if (new Date(intent.expires_at).getTime() < Date.now()) {
+    return res.status(400).json({ error: "intent expired" });
+  }
+
+  let isZero = intent.amount_usd_atomic === "0";
+  if (!isZero) {
+    try {
+      isZero = BigInt(intent.amount_usd_atomic) === 0n;
+    } catch {
+      isZero = false;
+    }
+  }
+  if (!isZero) {
+    return res.status(400).json({
+      error: "This order requires on-chain Tempo payment (amount > 0).",
+    });
+  }
+
+  const txHash = `free:${orderId}:${crypto.randomBytes(12).toString("hex")}`;
+  const grantExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const grantRow = {
+    order_id: orderId,
+    agent_id: intent.agent_id,
+    payer_wallet: "0x0000000000000000000000000000000000000000",
+    tx_hash: txHash,
+    amount_usd_atomic: "0",
+    runs_remaining: 1,
+    expires_at: grantExpires,
+  };
+
+  const { data: grant, error: gErr } = await supabase.from("tempo_access_grants").insert(grantRow).select("id").single();
+
+  if (gErr || !grant) {
+    if (/relation|does not exist/i.test(gErr?.message || "")) {
+      return res.status(503).json({
+        error: "tempo_access_grants missing",
+        message: "Supabase で docs/supabase-tempo-payments.sql を実行してください。",
+      });
+    }
+    return res.status(400).json({ error: gErr?.message || "failed to save grant" });
+  }
+
+  await supabase.from("tempo_payment_intents").delete().eq("order_id", orderId);
+  tempoIntentMemory.delete(orderId);
+
+  const expSec = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+  const accessToken = signAccessToken(
+    { grantId: grant.id, agentId: intent.agent_id, exp: expSec },
+    secret
+  );
+
+  res.json({
+    ok: true,
+    accessToken,
+    grantId: grant.id,
+    agentId: intent.agent_id,
     expiresAt: grantExpires,
     usePath: `./agent-use.html?agent=${encodeURIComponent(intent.agent_id)}`,
   });
@@ -659,13 +877,14 @@ app.post("/api/agents", async (req, res) => {
 // エージェント更新
 app.patch("/api/agents/:id", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
-  const { name, category, shortDescription, pricePerRun, system_prompt } = req.body || {};
+  const { name, category, shortDescription, pricePerRun, system_prompt, ui_variant } = req.body || {};
   const updates = {};
   if (name !== undefined) updates.name = String(name).trim();
   if (category !== undefined) updates.category = String(category).trim() || null;
   if (shortDescription !== undefined) updates.short_description = String(shortDescription).trim() || null;
   if (pricePerRun !== undefined) updates.price_per_run = typeof pricePerRun === "number" ? pricePerRun : parseInt(pricePerRun, 10) || 0;
   if (system_prompt !== undefined) updates.system_prompt = String(system_prompt).trim() || "You are a helpful assistant.";
+  if (ui_variant !== undefined) updates.ui_variant = String(ui_variant).trim() || null;
   updates.updated_at = new Date().toISOString();
   const { data, error } = await supabase.from("agents").update(updates).eq("id", req.params.id).select("id, name, category, short_description, price_per_run").single();
   if (error) return res.status(400).json({ error: error.message });

@@ -19,19 +19,37 @@
         <div id="state-loading" class="page-empty"><p>Loading…</p></div>
         <div id="state-need-pay" class="page-card" style="display: none;">
           <h1 id="np-title"></h1>
-          <p>This agent is paid. Complete Tempo checkout first.</p>
-          <p><a id="np-pay" href="#" class="btn primary-btn">Pay with Tempo</a></p>
+          <p>
+            Free and paid agents must complete checkout first (free unlocks without a chain transfer; paid uses
+            Tempo).
+          </p>
+          <p><a id="np-pay" href="#" class="btn primary-btn">Go to checkout</a></p>
         </div>
-        <div id="state-chat" style="display: none;">
+
+        <div id="ui-wrap-chat" style="display: none;">
           <h1 id="ch-title"></h1>
           <p id="ch-sub" class="page-lead" style="font-size: 14px;"></p>
-          <div id="ch-log" class="page-card" style="min-height: 8rem; white-space: pre-wrap; margin-bottom: 1rem;"></div>
+          <div id="ch-log" class="page-card agent-use-log"></div>
           <label for="ch-input">Message</label>
           <textarea id="ch-input" rows="3" style="width: 100%; max-width: 42rem; padding: 0.5rem; margin-top: 0.35rem;"></textarea>
           <p style="margin-top: 0.75rem;">
             <button type="button" id="ch-send" class="btn primary-btn">Send</button>
           </p>
-          <p id="ch-err" style="color: #c00; font-size: 14px;"></p>
+          <p id="ch-err" class="agent-use-err"></p>
+        </div>
+
+        <div id="ui-wrap-research" style="display: none;">
+          <p class="badge accent" style="margin-bottom: 0.5rem;">Research UI</p>
+          <h1 id="rs-title"></h1>
+          <p id="rs-sub" class="page-lead agent-use-research-lead"></p>
+          <label for="rs-input">Research topic / question</label>
+          <textarea id="rs-input" rows="6" class="agent-use-research-input"></textarea>
+          <p style="margin-top: 0.75rem;">
+            <button type="button" id="rs-send" class="btn primary-btn">Run research</button>
+          </p>
+          <h2 class="agent-use-h2" style="margin-top: 1.5rem; font-size: 1rem;">Result</h2>
+          <div id="rs-log" class="page-card agent-use-research-log"></div>
+          <p id="rs-err" class="agent-use-err"></p>
         </div>
       </section>
     </main>
@@ -48,6 +66,48 @@
           return "buildy_tempo_access_" + agentId;
         }
 
+        function getToken() {
+          try {
+            return sessionStorage.getItem(tokenKey());
+          } catch (_) {
+            return null;
+          }
+        }
+
+        function runExecute(userText, logEl, errEl, appendUserPrefix) {
+          errEl.textContent = "";
+          if (appendUserPrefix) {
+            logEl.textContent += "\n\n" + appendUserPrefix + "\n" + userText;
+          }
+          var token = getToken();
+          var headers = { "Content-Type": "application/json" };
+          if (token) headers["X-Buildy-Access-Token"] = token;
+          return fetch("/api/agent/execute", {
+            method: "POST",
+            headers: headers,
+            body: JSON.stringify({
+              agent_id: agentId,
+              user_message: userText,
+              stream: false,
+            }),
+          })
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j, status: r.status };
+              });
+            })
+            .then(function (_ref) {
+              if (!_ref.ok) {
+                errEl.textContent = _ref.j.message || _ref.j.error || "Run failed (HTTP " + _ref.status + ")";
+                return;
+              }
+              logEl.textContent += "\n\n[Output]\n" + (_ref.j.content || "");
+            })
+            .catch(function () {
+              errEl.textContent = "Network error.";
+            });
+        }
+
         fetch("/api/agents/" + encodeURIComponent(agentId))
           .then(function (r) {
             if (!r.ok) throw new Error("not found");
@@ -56,15 +116,10 @@
           .then(function (data) {
             var agent = data.agent;
             if (!agent) throw new Error("not found");
-            var price = Number(agent.pricePerRun) || 0;
-            var token = null;
-            try {
-              token = sessionStorage.getItem(tokenKey());
-            } catch (_) {}
-
+            var token = getToken();
             document.getElementById("state-loading").style.display = "none";
 
-            if (price > 0 && !token) {
+            if (!token) {
               var np = document.getElementById("state-need-pay");
               np.style.display = "block";
               document.getElementById("np-title").textContent = agent.name;
@@ -72,50 +127,34 @@
               return;
             }
 
-            var chat = document.getElementById("state-chat");
-            chat.style.display = "block";
-            document.getElementById("ch-title").textContent = agent.name;
-            document.getElementById("ch-sub").textContent =
-              price > 0
-                ? "Paid agent: using your checkout session (each run consumes one grant)."
-                : "Free to use.";
-
-            var logEl = document.getElementById("ch-log");
-            var errEl = document.getElementById("ch-err");
-
-            document.getElementById("ch-send").addEventListener("click", function () {
-              var text = document.getElementById("ch-input").value.trim();
-              if (!text) return;
-              errEl.textContent = "";
-              logEl.textContent += "\n\n[You]\n" + text;
-              var headers = { "Content-Type": "application/json" };
-              if (token) headers["X-Buildy-Access-Token"] = token;
-              fetch("/api/agent/execute", {
-                method: "POST",
-                headers: headers,
-                body: JSON.stringify({
-                  agent_id: agentId,
-                  user_message: text,
-                  stream: false,
-                }),
-              })
-                .then(function (r) {
-                  return r.json().then(function (j) {
-                    return { ok: r.ok, j: j };
-                  });
-                })
-                .then(function (_ref) {
-                  if (!_ref.ok) {
-                    errEl.textContent = _ref.j.message || _ref.j.error || "Run failed";
-                    return;
-                  }
-                  logEl.textContent += "\n\n[Agent]\n" + (_ref.j.content || "");
-                  document.getElementById("ch-input").value = "";
-                })
-                .catch(function () {
-                  errEl.textContent = "Network error (is Next.js /api/agent/execute available?)";
-                });
-            });
+            var variant = agent.uiVariant || "chat";
+            if (variant === "research") {
+              document.getElementById("ui-wrap-research").style.display = "block";
+              document.getElementById("rs-title").textContent = agent.name;
+              document.getElementById("rs-sub").textContent =
+                "Describe what to investigate; the model responds in one shot. Each run uses one checkout grant. Price: ¥" +
+                (Number(agent.pricePerRun) || 0) +
+                " (checkout completed in this session).";
+              document.getElementById("rs-send").addEventListener("click", function () {
+                var text = document.getElementById("rs-input").value.trim();
+                if (!text) return;
+                runExecute(text, document.getElementById("rs-log"), document.getElementById("rs-err"), "[Topic]");
+                document.getElementById("rs-input").value = "";
+              });
+            } else {
+              document.getElementById("ui-wrap-chat").style.display = "block";
+              document.getElementById("ch-title").textContent = agent.name;
+              document.getElementById("ch-sub").textContent =
+                "Chat UI · ¥" +
+                (Number(agent.pricePerRun) || 0) +
+                " · Each message consumes one run from your checkout grant.";
+              document.getElementById("ch-send").addEventListener("click", function () {
+                var text = document.getElementById("ch-input").value.trim();
+                if (!text) return;
+                runExecute(text, document.getElementById("ch-log"), document.getElementById("ch-err"), "[You]");
+                document.getElementById("ch-input").value = "";
+              });
+            }
           })
           .catch(function () {
             document.getElementById("state-loading").innerHTML = "<p>Agent not found.</p>";

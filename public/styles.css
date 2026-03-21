@@ -19,6 +19,10 @@
   box-sizing: border-box;
 }
 
+html {
+  height: 100%;
+}
+
 html,
 body {
   margin: 0;
@@ -176,6 +180,41 @@ button {
   max-width: 40rem;
 }
 
+.agent-use-log {
+  min-height: 8rem;
+  white-space: pre-wrap;
+  margin-bottom: 1rem;
+}
+
+.agent-use-err {
+  color: #c00;
+  font-size: 14px;
+}
+
+.agent-use-research-input {
+  width: 100%;
+  max-width: 42rem;
+  padding: 0.75rem;
+  margin-top: 0.35rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-soft);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.agent-use-research-log {
+  min-height: 12rem;
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.55;
+  background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
+}
+
+.agent-use-h2 {
+  font-weight: 600;
+  color: var(--text-sub);
+}
+
 .btn.text-btn {
   background: transparent;
   color: var(--text-sub);
@@ -304,6 +343,93 @@ button {
 
 .hero-main-input::placeholder {
   color: #a8a8a8;
+}
+
+/* ランディング（index / index-ja）: 最初の1画面をビューポート全面に */
+body.landing {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+body.landing > main {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+body.landing .hero.hero--split {
+  flex: 1;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body.landing .hero .container.hero-openai-layout {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: clamp(10px, 3vw, 32px) clamp(12px, 4vw, 48px);
+  box-sizing: border-box;
+  display: grid;
+  align-items: center;
+  align-content: center;
+}
+
+body.landing .hero-openai-layout {
+  padding-left: 0;
+  grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);
+  gap: clamp(20px, 5vw, 72px);
+  justify-content: stretch;
+}
+
+body.landing .hero-main {
+  width: 100%;
+  max-width: min(960px, 100%);
+  margin: 0 auto;
+}
+
+body.landing .hero-main-search-row {
+  grid-template-columns: minmax(0, 1fr) 64px;
+  width: 100%;
+  max-width: none;
+}
+
+body.landing .hero-main-secondary {
+  justify-content: center;
+}
+
+@media (max-width: 720px) {
+  body.landing .hero-openai-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    align-content: start;
+    padding-top: clamp(16px, 4vw, 28px);
+  }
+
+  body.landing .hero-nav-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px 18px;
+  }
+
+  body.landing .hero-nav-lang {
+    margin-top: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  body.landing .hero {
+    padding-top: 0;
+  }
 }
 
 .hero-main-button {

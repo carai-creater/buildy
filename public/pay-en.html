@@ -18,14 +18,27 @@
       <section class="page-main page-main--narrow">
         <h1>Pay with Tempo</h1>
         <p class="page-lead">
-          Paid agents are billed in stablecoins on
-          <a href="https://tempo.xyz/" target="_blank" rel="noopener noreferrer">Tempo</a> (TIP-20). After payment is verified, you can run the agent on Buildy.
+          Every agent requires checkout on this page. Paid runs settle on
+          <a href="https://tempo.xyz/" target="_blank" rel="noopener noreferrer">Tempo</a>
+          (TIP-20). Free agents confirm checkout here without an on-chain transfer.
         </p>
 
         <div id="state-loading" class="page-empty"><p>Loading…</p></div>
         <div id="state-error" class="page-empty" style="display: none;"></div>
-        <div id="state-free" class="page-card" style="display: none;">
-          <p>This agent is free. Redirecting…</p>
+        <div id="state-pay-free" class="page-card" style="display: none;">
+          <h2 id="free-agent-name"></h2>
+          <p id="free-agent-desc" class="page-agent-desc"></p>
+          <p><strong>Price</strong>: ¥0 (no on-chain transfer)</p>
+          <p class="page-note" style="font-size: 14px; color: var(--text-sub);">
+            Paid flows use <a href="https://tempo.xyz/" target="_blank" rel="noopener noreferrer">Tempo</a>. Free agents still pass through this checkout to unlock Buildy.
+          </p>
+          <p style="margin-top: 1rem;">
+            <button type="button" id="btn-confirm-free" class="btn primary-btn">Complete checkout &amp; unlock access</button>
+          </p>
+          <p id="free-verify-result" style="margin-top: 0.75rem; font-size: 14px;"></p>
+          <p id="free-next-step" style="margin-top: 1rem; display: none;">
+            <a id="free-use-link" href="#" class="btn primary-btn">Open agent</a>
+          </p>
         </div>
         <div id="state-pay" class="page-card" style="display: none;">
           <h2 id="agent-name"></h2>
@@ -66,7 +79,7 @@
         var agentId = params.get("agent");
         var loading = document.getElementById("state-loading");
         var errEl = document.getElementById("state-error");
-        var freeEl = document.getElementById("state-free");
+        var payFreeEl = document.getElementById("state-pay-free");
         var payEl = document.getElementById("state-pay");
         var intent = null;
 
@@ -95,12 +108,42 @@
               showError((data && data.message) || data.error || "Could not start checkout.");
               return;
             }
-            if (data.free) {
-              freeEl.style.display = "block";
-              window.location.replace("./agent-use-en.html?agent=" + encodeURIComponent(agentId));
+            intent = data;
+            if (data.checkoutKind === "free") {
+              payFreeEl.style.display = "block";
+              document.getElementById("free-agent-name").textContent = data.agent.name;
+              document.getElementById("free-agent-desc").textContent = data.agent.shortDescription || "";
+              document.getElementById("btn-confirm-free").onclick = function () {
+                var out = document.getElementById("free-verify-result");
+                out.textContent = "Processing…";
+                fetch("/api/payments/tempo/confirm-free", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ orderId: data.orderId }),
+                })
+                  .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                  .then(function (x) {
+                    if (!x.ok) {
+                      out.textContent = x.j.error || "Failed";
+                      out.style.color = "#c00";
+                      return;
+                    }
+                    out.style.color = "";
+                    out.textContent = "Access unlocked.";
+                    try {
+                      sessionStorage.setItem("buildy_tempo_access_" + agentId, x.j.accessToken);
+                    } catch (_) {}
+                    document.getElementById("free-next-step").style.display = "block";
+                    document.getElementById("free-use-link").href =
+                      "./agent-use-en.html?agent=" + encodeURIComponent(agentId);
+                  })
+                  .catch(function () {
+                    out.textContent = "Network error";
+                    out.style.color = "#c00";
+                  });
+              };
               return;
             }
-            intent = data;
             payEl.style.display = "block";
             document.getElementById("agent-name").textContent = data.agent.name;
             document.getElementById("agent-desc").textContent = data.agent.shortDescription || "";
