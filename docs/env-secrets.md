@@ -24,6 +24,8 @@
 
 1. プロジェクト → **Settings** → **Environment Variables**
 2. 上記の変数を **Production / Preview / Development** の必要な環境に追加
-3. 再デプロイ
+3. **再デプロイ**（変数を追加・変更しただけでは反映されない）
 
 ローカルで `vercel dev` を使う場合、同じプロジェクトにリンクしていれば Vercel に登録した値が注入されます。**.env ファイルは作成しない**でください。
+
+Supabase の接続確認やテーブル作成の手順は **`docs/supabase-config-checklist.md`** を参照。

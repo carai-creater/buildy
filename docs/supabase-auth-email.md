@@ -57,6 +57,25 @@ Vercel（またはサーバー）の環境変数に次を追加します。
 3. 認証後、Supabase が `auth-callback.html`（利用者の場合は `?next=user`）にリダイレクト。`?code=...` またはハッシュでセッションを取得。
 4. `exchangeCodeForSession` または `setSession` でセッション確定 → `/api/creators/me` または `/api/users/me` で DB 同期 → ダッシュボードまたはマイページへ。
 
+### トラブル: `localhost:3000` に飛ぶ / `bad_oauth_state` / `ERR_CONNECTION_REFUSED`
+
+Google のあと **ブラウザが `http://localhost:3000` を開き**、`error_code=bad_oauth_state`（OAuth state not found or expired）や **接続できない** になる場合の典型原因は次のとおりです。
+
+1. **Supabase の Site URL が `http://localhost:3000` のまま**  
+   **Authentication → URL Configuration** の **Site URL** を、実際に使う本番 URL に変更する（例: `https://buildy-inky.vercel.app`）。  
+   **Redirect URLs** にも次を追加する（末尾は実サイトに合わせる）:
+   - `https://あなたのドメイン/auth-callback.html`
+   - `https://あなたのドメイン/auth-callback.html?next=user`
+
+2. **本番でログインを始めたのに、戻り先だけローカル**  
+   OAuth の「state」は **ログインを開始したページと同じオリジン**で完了する必要があります。**Vercel 上のサイト**で「Googleで登録」を押したら、戻りも **同じ Vercel の URL** になるよう、上記 Site URL / Redirect URLs を本番に合わせる。
+
+3. **`localhost:3000` で試す場合**  
+   ローカルで `node server.js`（または `npm run dev`）を動かし、**ポート 3000** でページを開いた状態で Google ログインを開始する。Supabase の Redirect URLs に `http://localhost:3000/auth-callback.html` を追加する。
+
+4. **設定変更後**  
+   ブラウザの当該サイトの Cookie を消すかシークレットウィンドウで、**もう一度** 本番（またはローカル）から Google ログインをやり直す。
+
 ## 注意
 
 - **anon key** はクライアントに渡すため、RLS で「誰が何を読めるか」を正しく設定してください。  

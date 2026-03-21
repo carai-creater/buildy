@@ -18,13 +18,15 @@
 
 ```bash
 cd /Users/rentaro/cursor/buildy3
-open index.html   # macOS の場合
+open index.html   # macOS（トップは英語。日本語は index-ja.html）
 ```
 
 もしくは、任意の静的ファイルサーバー（`python -m http.server` など）でルートディレクトリをホストしてブラウザでアクセスしてください。
 
 ## ファイル構成
 
-- `index.html` — メインのページ本体
+- `index.html` — トップ（英語）
+- `index-ja.html` — トップ（日本語）
+- `index-en.html` — 互換用リダイレクト → `index.html`
 - `styles.css` — レイアウト・タイポグラフィ・レスポンシブ対応等のスタイル
 

@@ -9,9 +9,9 @@
   <body>
     <main class="page">
       <header class="page-header">
-        <a href="./index.html" class="page-logo">Buildy</a>
+        <a href="./index-ja.html" class="page-logo">Buildy</a>
         <nav class="page-nav">
-          <a href="./index.html">トップ</a>
+          <a href="./index-ja.html">トップ</a>
           <a href="./agents.html">エージェント</a>
           <a href="./creator-dashboard.html">ダッシュボード</a>
           <a href="./agent-add.html">エージェントを追加</a>
@@ -20,7 +20,8 @@
       <section class="page-main">
         <h1>クリエイター登録</h1>
         <p class="page-lead">Buildy でエージェントを公開するには、まずクリエイターとして登録してください。</p>
-        <div id="register-with-auth">
+        <p id="register-loading" class="page-lead" style="margin-bottom: 1rem; color: var(--text-sub);">接続設定を確認しています…</p>
+        <div id="register-with-auth" style="display: none;">
           <p class="page-lead" style="margin-bottom: 1rem;">Googleで登録するか、メール・パスワードで登録してください。</p>
           <p style="margin-bottom: 1rem;">
             <button type="button" id="google-signup-btn" class="btn primary-btn" style="display: inline-flex; align-items: center; gap: 0.5rem;">
@@ -60,10 +61,16 @@
         var noAuth = document.getElementById("register-no-auth");
         var formAuth = document.getElementById("register-form-auth");
         var form = document.getElementById("register-form");
+        var loadingEl = document.getElementById("register-loading");
+
+        function hideRegisterLoading() {
+          if (loadingEl) loadingEl.style.display = "none";
+        }
 
         fetch("/api/config")
           .then(function (r) { return r.json(); })
           .then(function (config) {
+            hideRegisterLoading();
             if (config.supabaseUrl && config.supabaseAnonKey) {
               withAuth.style.display = "block";
               noAuth.style.display = "none";
@@ -133,6 +140,10 @@
             } else {
               withAuth.style.display = "none";
               noAuth.style.display = "block";
+              if (resultEl && config.envHint) {
+                resultEl.textContent = config.envHint;
+                resultEl.style.color = "var(--text-sub)";
+              }
               if (!form || !resultEl) return;
               form.addEventListener("submit", function (e) {
                 e.preventDefault();
@@ -189,6 +200,7 @@
             }
           })
           .catch(function () {
+            hideRegisterLoading();
             withAuth.style.display = "none";
             if (noAuth) noAuth.style.display = "block";
             if (form) {

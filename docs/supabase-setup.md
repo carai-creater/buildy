@@ -2,6 +2,8 @@
 
 Buildy でクリエイター登録・エージェント一覧を使うには、Supabase のプロジェクトが必要です。
 
+> **設定を見直したいとき** → [Supabase 設定の見直しチェックリスト](supabase-config-checklist.md) を参照。
+
 ## 1. プロジェクトを作成する
 
 1. **Supabase にアクセス**  
