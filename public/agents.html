@@ -51,6 +51,11 @@
             <p class="page-agent-desc">${escapeHtml(a.shortDescription || "")}</p>
             <p class="page-agent-price">¥${Number(a.pricePerRun) || 0} / 実行</p>
             <a href="./pay.html?agent=${encodeURIComponent(a.id)}" class="btn primary-btn">チェックアウトして利用</a>
+            ${
+              a.publicUiUrl
+                ? `<p class="page-note" style="margin-top:0.65rem;font-size:13px"><a href="${String(a.publicUiUrl).replace(/&/g, "&amp;").replace(/"/g, "&quot;")}" target="_blank" rel="noopener noreferrer">クリエイター提供 UI</a>（チェックアウト後に利用）</p>`
+                : ""
+            }
           </article>
         `
               )

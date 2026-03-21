@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- デプロイ時: Buildy のオリジンを入れると入力欄が自動で埋まります -->
+    <!-- <meta name="buildy-api-origin" content="https://your-buildy.vercel.app" /> -->
+    <title>Buildy agent UI sample</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
+      textarea { width: 100%; min-height: 5rem; }
+      pre { white-space: pre-wrap; background: #f5f5f5; padding: 1rem; border-radius: 8px; }
+      .err { color: #c00; }
+    </style>
+  </head>
+  <body>
+    <h1>Buildy 連携サンプル UI</h1>
+    <p>
+      デプロイした Buildy のオリジンを指定してください（例: <code>https://xxx.vercel.app</code>）。チェックアウト後に Buildy からこのページへリダイレクトされると、ハッシュからトークンが取り込まれます。
+    </p>
+    <p>
+      <label>Buildy API オリジン<br />
+        <input id="api-base" type="url" placeholder="https://your-buildy.vercel.app" style="width: 100%" />
+      </label>
+    </p>
+    <p id="status" class="err"></p>
+    <p>
+      <label>メッセージ<br />
+        <textarea id="msg" placeholder="エージェントへの入力"></textarea>
+      </label>
+    </p>
+    <p><button type="button" id="run">実行</button></p>
+    <h2>応答</h2>
+    <pre id="out"></pre>
+    <script>
+      (function () {
+        var BUILDY_ACCESS_KEY = "buildy_access_token";
+        var BUILDY_AGENT_KEY = "buildy_agent_id";
+
+        (function prefillApiBase() {
+          var input = document.getElementById("api-base");
+          if (!input) return;
+          var meta = document.querySelector('meta[name="buildy-api-origin"]');
+          var fromMeta = meta && meta.getAttribute("content") ? meta.getAttribute("content").trim() : "";
+          var q = new URLSearchParams(location.search).get("buildy_api");
+          var fromQuery = q ? q.trim() : "";
+          var stored = "";
+          try {
+            stored = sessionStorage.getItem("buildy_api_base") || "";
+          } catch (e) {}
+          var v = fromMeta || fromQuery || stored;
+          if (v) {
+            input.value = v.replace(/\/$/, "");
+            try {
+              sessionStorage.setItem("buildy_api_base", input.value);
+            } catch (e) {}
+          }
+        })();
+
+        function parseHash() {
+          var h = (location.hash || "").replace(/^#/, "");
+          if (!h) return;
+          var params = new URLSearchParams(h);
+          var tok = params.get("buildy_access");
+          var aid = params.get("buildy_agent");
+          if (tok) {
+            try {
+              sessionStorage.setItem(BUILDY_ACCESS_KEY, tok);
+            } catch (e) {}
+          }
+          if (aid) {
+            try {
+              sessionStorage.setItem(BUILDY_AGENT_KEY, aid);
+            } catch (e) {}
+          }
+          if (tok || aid) {
+            history.replaceState(null, "", location.pathname + location.search);
+          }
+        }
+        parseHash();
+
+        document.getElementById("run").onclick = function () {
+          var base = document.getElementById("api-base").value.trim().replace(/\/$/, "");
+          var token = "";
+          var agentId = "";
+          try {
+            token = sessionStorage.getItem(BUILDY_ACCESS_KEY) || "";
+            agentId = sessionStorage.getItem(BUILDY_AGENT_KEY) || "";
+          } catch (e) {}
+          var st = document.getElementById("status");
+          var out = document.getElementById("out");
+          st.textContent = "";
+          out.textContent = "";
+          if (!base) {
+            st.textContent = "Buildy API オリジンを入力してください。";
+            return;
+          }
+          if (!token || !agentId) {
+            st.textContent =
+              "トークンまたはエージェント ID がありません。Buildy のチェックアウト完了後にこのページへ遷移するよう public_ui_url を設定してください。";
+            return;
+          }
+          var text = document.getElementById("msg").value.trim();
+          if (!text) {
+            st.textContent = "メッセージを入力してください。";
+            return;
+          }
+          fetch(base + "/api/agent/execute", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Buildy-Access-Token": token,
+            },
+            body: JSON.stringify({ agent_id: agentId, user_message: text, stream: false }),
+          })
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              if (!x.ok) {
+                st.textContent = (x.j && (x.j.message || x.j.error)) || "エラー";
+                out.textContent = JSON.stringify(x.j, null, 2);
+                return;
+              }
+              out.textContent = x.j.content || JSON.stringify(x.j, null, 2);
+            })
+            .catch(function () {
+              st.textContent = "通信エラー";
+            });
+        };
+      })();
+    </script>
+  </body>
+</html>

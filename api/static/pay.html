@@ -23,7 +23,10 @@
         <div id="state-stripe-done" class="page-card" style="display: none;">
           <p><strong>お支払いが完了しました。</strong> このブラウザで利用できます。</p>
           <p style="margin-top: 1rem;">
-            <a id="stripe-done-link" href="#" class="btn primary-btn">エージェントを利用する</a>
+            <a id="stripe-done-link" href="#" class="btn primary-btn">Buildy で使う</a>
+          </p>
+          <p id="stripe-creator-extra" style="margin-top: 0.75rem; display: none;">
+            <button type="button" id="stripe-creator-btn" class="btn secondary-btn">クリエイターアプリを別タブで開く</button>
           </p>
         </div>
         <div id="state-pay-free" class="page-card" style="display: none;">
@@ -35,7 +38,10 @@
           </p>
           <p id="free-verify-result" style="margin-top: 0.75rem; font-size: 14px;"></p>
           <p id="free-next-step" style="margin-top: 1rem; display: none;">
-            <a id="free-use-link" href="#" class="btn primary-btn">エージェントを利用する</a>
+            <a id="free-use-link" href="#" class="btn primary-btn">Buildy で使う</a>
+          </p>
+          <p id="free-creator-extra" style="margin-top: 0.75rem; display: none;">
+            <button type="button" id="free-creator-btn" class="btn secondary-btn">クリエイターアプリを別タブで開く</button>
           </p>
         </div>
         <div id="state-pay" class="page-card" style="display: none;">
@@ -90,6 +96,16 @@
         var payEl = document.getElementById("state-pay");
         var intent = null;
 
+        function buildyOpenCreatorAppTab(publicUiUrl, accessToken, agId) {
+          if (!publicUiUrl || !String(publicUiUrl).trim()) return;
+          try {
+            var u = new URL(String(publicUiUrl).trim());
+            u.hash =
+              "buildy_access=" + encodeURIComponent(accessToken) + "&buildy_agent=" + encodeURIComponent(agId);
+            window.open(u.toString(), "_blank", "noopener,noreferrer");
+          } catch (e) {}
+        }
+
         function showError(msg) {
           loading.style.display = "none";
           errEl.style.display = "block";
@@ -122,6 +138,12 @@
               document.getElementById("state-stripe-done").style.display = "block";
               document.getElementById("stripe-done-link").href =
                 "./agent-use.html?agent=" + encodeURIComponent(agentId);
+              if (x.j.publicUiUrl) {
+                document.getElementById("stripe-creator-extra").style.display = "block";
+                document.getElementById("stripe-creator-btn").onclick = function () {
+                  buildyOpenCreatorAppTab(x.j.publicUiUrl, x.j.accessToken, agentId);
+                };
+              }
             })
             .catch(function () {
               loading.style.display = "none";
@@ -173,6 +195,12 @@
                     document.getElementById("free-next-step").style.display = "block";
                     document.getElementById("free-use-link").href =
                       "./agent-use.html?agent=" + encodeURIComponent(agentId);
+                    if (x.j.publicUiUrl) {
+                      document.getElementById("free-creator-extra").style.display = "block";
+                      document.getElementById("free-creator-btn").onclick = function () {
+                        buildyOpenCreatorAppTab(x.j.publicUiUrl, x.j.accessToken, agentId);
+                      };
+                    }
                   })
                   .catch(function () {
                     out.textContent = "通信エラー";

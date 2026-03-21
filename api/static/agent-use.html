@@ -19,10 +19,15 @@
         <div id="state-loading" class="agent-use-loading"><p>読み込み中…</p></div>
         <div id="state-need-pay" class="agent-use-card agent-use-card--notice" style="display: none;">
           <h1 class="agent-use-heading" id="np-title"></h1>
-          <p class="agent-use-muted">このエージェントを使うにはチェックアウトが必要です。</p>
+          <p class="agent-use-muted" id="np-muted">このエージェントを使うにはチェックアウトが必要です。</p>
           <p style="margin-top: 1.25rem;">
             <a id="np-pay" href="#" class="btn primary-btn">チェックアウトへ</a>
           </p>
+        </div>
+
+        <div id="creator-ui-banner" class="agent-use-creator-banner" style="display: none;">
+          <p>このエージェントには<strong>クリエイター提供のアプリ</strong>もあります。下の Buildy 画面のまま使うか、別タブで開くか選べます（同じ利用権）。</p>
+          <button type="button" id="creator-ui-open-btn" class="btn secondary-btn">クリエイターアプリを開く</button>
         </div>
 
         <div id="ui-wrap-chat" class="agent-use-workspace" style="display: none;">
@@ -79,6 +84,15 @@
           }
         }
 
+        function openCreatorAppTab(publicUiUrl, accessToken, agId) {
+          try {
+            var u = new URL(String(publicUiUrl).trim());
+            u.hash =
+              "buildy_access=" + encodeURIComponent(accessToken) + "&buildy_agent=" + encodeURIComponent(agId);
+            window.open(u.toString(), "_blank", "noopener,noreferrer");
+          } catch (e) {}
+        }
+
         function runExecute(userText, logEl, errEl, placeholderEl, sendBtn) {
           errEl.textContent = "";
           if (sendBtn) sendBtn.disabled = true;
@@ -132,15 +146,42 @@
             var token = getToken();
             document.getElementById("state-loading").style.display = "none";
 
+            var pui = agent.publicUiUrl && String(agent.publicUiUrl).trim();
+
             if (!token) {
               document.getElementById("state-need-pay").style.display = "block";
               document.getElementById("np-title").textContent = agent.name;
               document.getElementById("np-pay").href = "./pay.html?agent=" + encodeURIComponent(agentId);
+              var npMuted = document.getElementById("np-muted");
+              if (npMuted) {
+                if (pui) {
+                  npMuted.innerHTML =
+                    '先に Buildy でチェックアウトを完了してください。完了後はこのページまたは <a href="' +
+                    pui.replace(/"/g, "&quot;") +
+                    '" target="_blank" rel="noopener noreferrer">クリエイターアプリ</a> から利用できます。';
+                } else {
+                  npMuted.textContent = "このエージェントを使うにはチェックアウトが必要です。";
+                }
+              }
               return;
+            }
+
+            function wireCreatorBanner() {
+              if (!pui) return;
+              var b = document.getElementById("creator-ui-banner");
+              if (!b) return;
+              b.style.display = "block";
+              var btn = document.getElementById("creator-ui-open-btn");
+              if (btn) {
+                btn.onclick = function () {
+                  openCreatorAppTab(pui, getToken(), agentId);
+                };
+              }
             }
 
             var variant = agent.uiVariant || "chat";
             if (variant === "research") {
+              wireCreatorBanner();
               document.getElementById("ui-wrap-research").style.display = "flex";
               document.getElementById("rs-title").textContent = agent.name;
               var rsBtn = document.getElementById("rs-send");
@@ -157,6 +198,7 @@
                 document.getElementById("rs-input").value = "";
               });
             } else {
+              wireCreatorBanner();
               document.getElementById("ui-wrap-chat").style.display = "flex";
               document.getElementById("ch-title").textContent = agent.name;
               var chBtn = document.getElementById("ch-send");

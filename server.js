@@ -14,6 +14,7 @@ import {
   signAccessToken,
 } from "./lib/tempo-payment.js";
 import { consumeGrantForExecute } from "./lib/consume-grant.js";
+import { fetchFirstGithubPrompt, normalizeGithubOwnerRepo } from "./lib/github-fetch-prompt.js";
 
 /** Vercel サーバーレスでテーブル未作成時のフォールバック用（本番は Supabase の SQL を実行してください） */
 const tempoIntentMemory = new Map();
@@ -48,6 +49,43 @@ function jsonTempoSchemaMissing(tableKey) {
   return { error: "tempo_access_grants missing", ...tip };
 }
 
+/** エンドユーザーがアクセスするクリエイター提供 UI（GitHub Pages 等）の HTTPS URL */
+function validatePublicUiUrl(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return { ok: false, error: "public_ui_url is required (your hosted UI where users run the agent)" };
+  if (s.length > 2048) return { ok: false, error: "public_ui_url is too long" };
+  try {
+    const u = new URL(s);
+    const okProto =
+      u.protocol === "https:" ||
+      (u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1"));
+    if (!okProto) {
+      return { ok: false, error: "public_ui_url must use https:// (or http://localhost for local dev)" };
+    }
+    return { ok: true, value: s };
+  } catch {
+    return { ok: false, error: "public_ui_url must be a valid absolute URL" };
+  }
+}
+
+function validateGithubRepo(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return { ok: false, error: "github_repo is required (owner/repo or https://github.com/owner/repo)" };
+  if (s.length > 500) return { ok: false, error: "github_repo is too long" };
+  return { ok: true, value: s };
+}
+
+async function getAgentPublicUiUrl(supabase, agentId) {
+  try {
+    const { data, error } = await supabase.from("agents").select("public_ui_url").eq("id", agentId).maybeSingle();
+    if (error || !data) return null;
+    const v = String(data.public_ui_url || "").trim();
+    return v || null;
+  } catch {
+    return null;
+  }
+}
+
 function publicOrigin(req) {
   const envBase = (process.env.BUILDY_PUBLIC_URL || process.env.NEXT_PUBLIC_SITE_URL || "").trim().replace(/\/$/, "");
   if (envBase) return envBase;
@@ -70,6 +108,17 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 app.use(express.json());
+
+// クリエイターが別ドメインにホストした UI から Buildy API を呼ぶため
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api")) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Buildy-Access-Token");
+    if (req.method === "OPTIONS") return res.sendStatus(204);
+  }
+  next();
+});
 
 // #region agent log
 app.use((req, _res, next) => {
@@ -155,7 +204,7 @@ app.get("/api/agents", async (_req, res) => {
   // マーケットプレイス一覧はクリエイターが紐づけたエージェントのみ（creator_id あり）
   const { data, error } = await supabase
     .from("agents")
-    .select("id, name, category, short_description, price_per_run, hero")
+    .select("id, name, category, short_description, price_per_run, hero, public_ui_url")
     .not("creator_id", "is", null)
     .order("created_at", { ascending: false });
   if (error) return res.status(500).json({ error: error.message, agents: [] });
@@ -166,6 +215,7 @@ app.get("/api/agents", async (_req, res) => {
     shortDescription: r.short_description || "",
     pricePerRun: r.price_per_run ?? 0,
     hero: !!r.hero,
+    publicUiUrl: (r.public_ui_url && String(r.public_ui_url).trim()) || "",
   }));
   res.json({ agents });
 });
@@ -189,6 +239,8 @@ app.get("/api/agents/:id", async (req, res) => {
       hero: data.hero,
       system_prompt: data.system_prompt,
       uiVariant: uiVariant || "chat",
+      githubRepo: data.github_repo || "",
+      publicUiUrl: (data.public_ui_url && String(data.public_ui_url).trim()) || "",
     },
   });
 });
@@ -309,7 +361,7 @@ app.post("/api/payments/tempo/intent", async (req, res) => {
 
   const { data: agent, error: agentErr } = await supabase
     .from("agents")
-    .select("id, name, short_description, price_per_run, creator_id")
+    .select("id, name, short_description, price_per_run, creator_id, public_ui_url")
     .eq("id", agentId)
     .single();
   if (agentErr || !agent || !agent.creator_id) {
@@ -379,6 +431,7 @@ app.post("/api/payments/tempo/intent", async (req, res) => {
       name: agent.name,
       shortDescription: agent.short_description || "",
       pricePerRunYen: priceYen,
+      publicUiUrl: (agent.public_ui_url && String(agent.public_ui_url).trim()) || "",
     },
     intentExpiresAt: expiresAt,
   });
@@ -472,6 +525,7 @@ app.post("/api/payments/tempo/verify", async (req, res) => {
     secret
   );
 
+  const publicUiUrl = await getAgentPublicUiUrl(supabase, intent.agent_id);
   res.json({
     ok: true,
     accessToken,
@@ -479,6 +533,7 @@ app.post("/api/payments/tempo/verify", async (req, res) => {
     agentId: intent.agent_id,
     payerWallet: v.from,
     expiresAt: grantExpires,
+    ...(publicUiUrl ? { publicUiUrl } : {}),
     usePath: `./agent-use.html?agent=${encodeURIComponent(intent.agent_id)}`,
   });
 });
@@ -565,12 +620,14 @@ app.post("/api/payments/tempo/confirm-free", async (req, res) => {
     secret
   );
 
+  const publicUiUrl = await getAgentPublicUiUrl(supabase, intent.agent_id);
   res.json({
     ok: true,
     accessToken,
     grantId: grant.id,
     agentId: intent.agent_id,
     expiresAt: grantExpires,
+    ...(publicUiUrl ? { publicUiUrl } : {}),
     usePath: `./agent-use.html?agent=${encodeURIComponent(intent.agent_id)}`,
   });
 });
@@ -675,7 +732,7 @@ app.post("/api/payments/stripe/complete", async (req, res) => {
 
     const { data: agent, error: aerr } = await supabase
       .from("agents")
-      .select("id, price_per_run")
+      .select("id, price_per_run, public_ui_url")
       .eq("id", agentId)
       .single();
     if (aerr || !agent) return res.status(404).json({ error: "Agent not found" });
@@ -730,11 +787,13 @@ app.post("/api/payments/stripe/complete", async (req, res) => {
 
     const expSec = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
     const accessToken = signAccessToken({ grantId, agentId, exp: expSec }, secret);
+    const publicUiUrl = (agent.public_ui_url && String(agent.public_ui_url).trim()) || null;
     return res.json({
       ok: true,
       accessToken,
       grantId,
       agentId,
+      ...(publicUiUrl ? { publicUiUrl } : {}),
     });
   } catch (e) {
     console.error("[Buildy Stripe] complete", e);
@@ -931,7 +990,7 @@ app.get("/api/creators/:id", async (req, res) => {
   if (creatorError || !creator) return res.status(404).json({ error: "Creator not found" });
   const { data: agentsRows } = await supabase
     .from("agents")
-    .select("id, name, category, short_description, price_per_run, created_at")
+    .select("id, name, category, short_description, price_per_run, created_at, github_repo, public_ui_url")
     .eq("creator_id", req.params.id)
     .order("created_at", { ascending: false });
   const agents = (agentsRows || []).map((r) => ({
@@ -941,6 +1000,8 @@ app.get("/api/creators/:id", async (req, res) => {
     shortDescription: r.short_description || "",
     pricePerRun: r.price_per_run ?? 0,
     createdAt: r.created_at,
+    githubRepo: r.github_repo || "",
+    publicUiUrl: (r.public_ui_url && String(r.public_ui_url).trim()) || "",
   }));
   const agentIds = agents.map((a) => a.id);
   let totalRuns = 0;
@@ -1024,11 +1085,62 @@ app.get("/api/github/repo", async (req, res) => {
   }
 });
 
+/** GitHub リポジトリからプロンプト用テキストを取得（登録フォーム用・DB は更新しない） */
+app.get("/api/github/repo-prompt", async (req, res) => {
+  const raw = (req.query.repo || req.query.url || "").toString().trim();
+  const ownerRepo = normalizeGithubOwnerRepo(raw);
+  if (!ownerRepo) {
+    return res.status(400).json({ error: "repo query required (owner/repo or https://github.com/owner/repo)" });
+  }
+  const token = (process.env.GITHUB_TOKEN || "").trim() || null;
+  const result = await fetchFirstGithubPrompt(ownerRepo, token);
+  if (!result.ok) {
+    const status = result.error === "github_forbidden" ? 403 : result.error === "network" ? 502 : 404;
+    return res.status(status).json({ error: result.error, message: result.message });
+  }
+  res.json({ text: result.text, sourcePath: result.sourcePath, ownerRepo: result.ownerRepo });
+});
+
+/** エージェントの github_repo から system_prompt を再取得して保存 */
+app.post("/api/agents/:id/sync-github-prompt", async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+  const agentId = req.params.id;
+  const { data: agent, error } = await supabase
+    .from("agents")
+    .select("id, github_repo, creator_id")
+    .eq("id", agentId)
+    .single();
+  if (error || !agent) return res.status(404).json({ error: "Agent not found" });
+  const gh = String(agent.github_repo || "").trim();
+  if (!gh) return res.status(400).json({ error: "github_repo is not set for this agent" });
+  const token = (process.env.GITHUB_TOKEN || "").trim() || null;
+  const result = await fetchFirstGithubPrompt(gh, token);
+  if (!result.ok) {
+    const status = result.error === "github_forbidden" ? 403 : result.error === "network" ? 502 : 404;
+    return res.status(status).json({ error: result.error, message: result.message });
+  }
+  const { error: uerr } = await supabase
+    .from("agents")
+    .update({ system_prompt: result.text, updated_at: new Date().toISOString() })
+    .eq("id", agentId);
+  if (uerr) return res.status(400).json({ error: uerr.message });
+  res.json({
+    ok: true,
+    sourcePath: result.sourcePath,
+    length: result.text.length,
+  });
+});
+
 // エージェント追加（クリエイター登録済みの id を creator_id に指定）
 app.post("/api/agents", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
-  const { name, category, shortDescription, pricePerRun, system_prompt, creator_id, github_repo } = req.body || {};
+  const { name, category, shortDescription, pricePerRun, system_prompt, creator_id, github_repo, public_ui_url } =
+    req.body || {};
   if (!name || typeof name !== "string") return res.status(400).json({ error: "name is required" });
+  const gh = validateGithubRepo(github_repo);
+  if (!gh.ok) return res.status(400).json({ error: gh.error });
+  const ui = validatePublicUiUrl(public_ui_url);
+  if (!ui.ok) return res.status(400).json({ error: ui.error });
   let resolvedCreatorId =
     creator_id != null && String(creator_id).trim() !== "" ? String(creator_id).trim() : null;
   if (!resolvedCreatorId) {
@@ -1046,7 +1158,6 @@ app.post("/api/agents", async (req, res) => {
     });
   }
   const id = `agent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-  const githubRepoVal = github_repo && typeof github_repo === "string" ? github_repo.trim() || null : null;
   const row = {
     id,
     name: name.trim(),
@@ -1055,22 +1166,41 @@ app.post("/api/agents", async (req, res) => {
     price_per_run: typeof pricePerRun === "number" ? pricePerRun : parseInt(pricePerRun, 10) || 0,
     system_prompt: system_prompt && typeof system_prompt === "string" ? system_prompt.trim() : "You are a helpful assistant.",
     creator_id: resolvedCreatorId,
+    github_repo: gh.value,
+    public_ui_url: ui.value,
   };
-  if (githubRepoVal) row.github_repo = githubRepoVal;
-  let result = await supabase.from("agents").insert(row).select("id, name, category, short_description, price_per_run").single();
-  if (result.error && githubRepoVal && /github_repo|column.*does not exist/i.test(result.error.message)) {
-    delete row.github_repo;
-    result = await supabase.from("agents").insert(row).select("id, name, category, short_description, price_per_run").single();
+  let result = await supabase
+    .from("agents")
+    .insert(row)
+    .select("id, name, category, short_description, price_per_run, github_repo, public_ui_url")
+    .single();
+  if (result.error && /github_repo|public_ui_url|column|does not exist/i.test(result.error.message)) {
+    return res.status(503).json({
+      error: "database_schema",
+      message:
+        "Supabase で docs/supabase-agents-github-repo.sql と docs/supabase-agents-public-ui.sql を実行し、github_repo / public_ui_url カラムを追加してください。",
+    });
   }
   if (result.error) return res.status(400).json({ error: result.error.message });
   const data = result.data;
-  res.status(201).json({ agent: { id: data.id, name: data.name, category: data.category, shortDescription: data.short_description, pricePerRun: data.price_per_run } });
+  res.status(201).json({
+    agent: {
+      id: data.id,
+      name: data.name,
+      category: data.category,
+      shortDescription: data.short_description,
+      pricePerRun: data.price_per_run,
+      githubRepo: data.github_repo || "",
+      publicUiUrl: data.public_ui_url || "",
+    },
+  });
 });
 
 // エージェント更新
 app.patch("/api/agents/:id", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
-  const { name, category, shortDescription, pricePerRun, system_prompt, ui_variant } = req.body || {};
+  const { name, category, shortDescription, pricePerRun, system_prompt, ui_variant, github_repo, public_ui_url } =
+    req.body || {};
   const updates = {};
   if (name !== undefined) updates.name = String(name).trim();
   if (category !== undefined) updates.category = String(category).trim() || null;
@@ -1078,11 +1208,36 @@ app.patch("/api/agents/:id", async (req, res) => {
   if (pricePerRun !== undefined) updates.price_per_run = typeof pricePerRun === "number" ? pricePerRun : parseInt(pricePerRun, 10) || 0;
   if (system_prompt !== undefined) updates.system_prompt = String(system_prompt).trim() || "You are a helpful assistant.";
   if (ui_variant !== undefined) updates.ui_variant = String(ui_variant).trim() || null;
+  if (github_repo !== undefined) {
+    const gh = validateGithubRepo(github_repo);
+    if (!gh.ok) return res.status(400).json({ error: gh.error });
+    updates.github_repo = gh.value;
+  }
+  if (public_ui_url !== undefined) {
+    const ui = validatePublicUiUrl(public_ui_url);
+    if (!ui.ok) return res.status(400).json({ error: ui.error });
+    updates.public_ui_url = ui.value;
+  }
   updates.updated_at = new Date().toISOString();
-  const { data, error } = await supabase.from("agents").update(updates).eq("id", req.params.id).select("id, name, category, short_description, price_per_run").single();
+  const { data, error } = await supabase
+    .from("agents")
+    .update(updates)
+    .eq("id", req.params.id)
+    .select("id, name, category, short_description, price_per_run, github_repo, public_ui_url")
+    .single();
   if (error) return res.status(400).json({ error: error.message });
   if (!data) return res.status(404).json({ error: "Agent not found" });
-  res.json({ agent: { id: data.id, name: data.name, category: data.category, shortDescription: data.short_description, pricePerRun: data.price_per_run } });
+  res.json({
+    agent: {
+      id: data.id,
+      name: data.name,
+      category: data.category,
+      shortDescription: data.short_description,
+      pricePerRun: data.price_per_run,
+      githubRepo: data.github_repo || "",
+      publicUiUrl: data.public_ui_url || "",
+    },
+  });
 });
 
 // エージェント削除

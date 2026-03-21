@@ -197,6 +197,18 @@
             '<div class="cd-detail-block"><p class="cd-detail-label">Est. revenue (excl. tax)</p><p class="cd-detail-value">' +
             earn +
             "</p></div>" +
+            '<div class="cd-detail-block"><p class="cd-detail-label">GitHub repository</p><p class="cd-detail-value">' +
+            escapeHtml(agent.githubRepo || "—") +
+            "</p></div>" +
+            '<div class="cd-detail-block"><p class="cd-detail-label">End-user UI</p><p class="cd-detail-value">' +
+            (agent.publicUiUrl
+              ? '<a href="' +
+                String(agent.publicUiUrl).replace(/&/g, "&amp;").replace(/"/g, "&quot;") +
+                '" target="_blank" rel="noopener noreferrer">' +
+                escapeHtml(agent.publicUiUrl) +
+                "</a>"
+              : "—") +
+            "</p></div>" +
             '<div class="cd-detail-block"><p class="cd-detail-label">Agent ID</p><pre class="cd-detail-snippet">' +
             escapeHtml(agent.id) +
             "</pre></div>" +
@@ -204,6 +216,9 @@
             '<a href="./agent-edit-en.html?id=' +
             encodeURIComponent(agent.id) +
             '" class="btn primary-btn">Edit</a>' +
+            '<button type="button" class="btn secondary-btn agent-github-sync-btn" data-id="' +
+            escapeHtml(agent.id) +
+            '">Sync prompt from GitHub</button>' +
             '<button type="button" class="btn agent-delete-btn" data-id="' +
             escapeHtml(agent.id) +
             '">Delete</button>' +
@@ -217,6 +232,29 @@
                 if (r.status === 204) location.reload();
                 else r.json().then(function (d) { alert(d.error || "Delete failed"); });
               });
+            });
+          }
+          var syncGh = detailEl.querySelector(".agent-github-sync-btn");
+          if (syncGh) {
+            syncGh.addEventListener("click", function () {
+              var aid = syncGh.getAttribute("data-id");
+              if (!aid || !confirm("Overwrite system_prompt from GitHub (.buildy/prompt.md, README, etc.)?")) return;
+              fetch("/api/agents/" + encodeURIComponent(aid) + "/sync-github-prompt", { method: "POST" })
+                .then(function (r) {
+                  return r.json().then(function (j) {
+                    return { ok: r.ok, j: j };
+                  });
+                })
+                .then(function (x) {
+                  alert(
+                    x.ok
+                      ? "Synced: " + (x.j.sourcePath || "")
+                      : x.j.message || x.j.error || "Failed"
+                  );
+                })
+                .catch(function () {
+                  alert("Network error");
+                });
             });
           }
         }

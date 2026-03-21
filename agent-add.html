@@ -20,9 +20,9 @@
       </header>
       <section class="page-main">
         <h1>エージェントを追加</h1>
-        <p class="page-lead">新しいAIエージェントをマーケットに登録します。先に<a href="./creators-register.html">クリエイター登録</a>が必要です。GitHub のリポジトリから情報を取得してフォームを埋めることもできます。</p>
+        <p class="page-lead">新しい AI エージェントを登録します。<strong>GitHub 上のコード</strong>と、<strong>ユーザーが操作する公開 UI</strong>（GitHub Pages 等の <code>https://</code> URL）の両方が必須です。LLM 実行は Buildy API 経由です。詳細は <a href="./docs/creator-ui.md">docs/creator-ui.md</a> を参照してください。</p>
         <div class="page-form" style="max-width: 32rem; margin-bottom: 1.5rem;">
-          <h2 style="font-size: 1rem; margin-bottom: 0.5rem;">GitHub から取り込む（任意）</h2>
+          <h2 style="font-size: 1rem; margin-bottom: 0.5rem;">GitHub から取り込む</h2>
           <label for="github-repo">GitHub リポジトリ URL または owner/repo</label>
           <div style="display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap;">
             <input id="github-repo" type="text" placeholder="https://github.com/owner/repo または owner/repo" style="flex: 1; min-width: 12rem;" />
@@ -31,6 +31,11 @@
           <p id="github-fetch-result" style="margin-top: 0.5rem; font-size: 14px; color: var(--text-sub);"></p>
         </div>
         <form id="agent-form" class="page-form" style="max-width: 32rem;">
+          <label for="github_repo">GitHub リポジトリ *（owner/repo または URL）</label>
+          <input id="github_repo" name="github_repo" type="text" required placeholder="octocat/Hello-World" autocomplete="off" />
+          <label for="public_ui_url">ユーザー向け UI の URL *（HTTPS）</label>
+          <input id="public_ui_url" name="public_ui_url" type="url" required placeholder="https://you.github.io/your-agent/" autocomplete="off" />
+          <p class="page-note" style="font-size: 13px; color: var(--text-sub); margin-top: -0.25rem;">チェックアウト完了後、ユーザーはこの URL にリダイレクトされ、ハッシュでアクセストークンを受け取ります。</p>
           <label for="name">エージェント名 *</label>
           <input id="name" name="name" type="text" required placeholder="例: 市場調査エージェント" />
           <label for="category">カテゴリ</label>
@@ -40,10 +45,16 @@
           <label for="pricePerRun">1実行あたりの料金（円）</label>
           <input id="pricePerRun" name="pricePerRun" type="number" min="0" value="0" />
           <label for="system_prompt">システムプロンプト（LLM用）</label>
+          <p style="margin: 0 0 0.35rem; font-size: 13px; color: var(--text-sub);">
+            リポジトリ内の <code>.buildy/prompt.md</code> や <code>README.md</code> から取り込めます（公開リポジトリのみ）。
+          </p>
+          <p style="margin: 0 0 0.5rem;">
+            <button type="button" id="btn-load-github-prompt" class="btn secondary-btn" style="font-size: 14px;">GitHub からプロンプトを読み込む</button>
+          </p>
+          <p id="github-prompt-status" style="font-size: 13px; color: var(--text-sub); min-height: 1.25em;"></p>
           <textarea id="system_prompt" name="system_prompt" rows="4" placeholder="You are a helpful assistant. ..."></textarea>
           <label for="creator_id">クリエイターID（ログイン中は自動入力。別アカウントのときのみ変更）</label>
           <input id="creator_id" name="creator_id" type="text" placeholder="uuid" autocomplete="off" />
-          <input id="github_repo" name="github_repo" type="hidden" />
           <button type="submit" class="btn primary-btn">追加する</button>
         </form>
         <p id="agent-result" style="margin-top: 1rem;"></p>
@@ -73,7 +84,7 @@
       const githubRepoInput = document.getElementById("github-repo");
       const githubFetchBtn = document.getElementById("github-fetch-btn");
       const githubFetchResult = document.getElementById("github-fetch-result");
-      const hiddenGithubRepo = document.getElementById("github_repo");
+      const githubRepoField = document.getElementById("github_repo");
       if (githubFetchBtn && githubRepoInput) {
         githubFetchBtn.addEventListener("click", function () {
           var url = githubRepoInput.value.trim().replace(/\.git$/i, "").replace(/\/+$/, "").trim();
@@ -96,8 +107,10 @@
               var d = _.data;
               if (d.name) document.getElementById("name").value = d.name;
               if (d.description) document.getElementById("shortDescription").value = d.description;
-              if (d.full_name) hiddenGithubRepo.value = d.full_name;
-              else if (d.html_url) hiddenGithubRepo.value = d.html_url;
+              if (githubRepoField) {
+                if (d.full_name) githubRepoField.value = d.full_name;
+                else if (d.html_url) githubRepoField.value = d.html_url.replace(/^https?:\/\/github\.com\//i, "").replace(/\/$/, "");
+              }
               githubFetchResult.textContent = "取得しました: " + (d.full_name || d.name);
               githubFetchResult.style.color = "";
             })
@@ -106,6 +119,41 @@
               githubFetchResult.style.color = "#c00";
             })
             .finally(function () { githubFetchBtn.disabled = false; });
+        });
+      }
+      var btnGhPrompt = document.getElementById("btn-load-github-prompt");
+      if (btnGhPrompt) {
+        btnGhPrompt.addEventListener("click", function () {
+          var repo = document.getElementById("github_repo").value.trim();
+          var st = document.getElementById("github-prompt-status");
+          st.textContent = "";
+          st.style.color = "";
+          if (!repo) {
+            st.textContent = "先に GitHub リポジトリを入力してください。";
+            st.style.color = "#c00";
+            return;
+          }
+          st.textContent = "取得中…";
+          fetch("/api/github/repo-prompt?repo=" + encodeURIComponent(repo))
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              if (!x.ok) {
+                st.textContent = (x.j && (x.j.message || x.j.error)) || "読み込みに失敗しました";
+                st.style.color = "#c00";
+                return;
+              }
+              st.style.color = "";
+              st.textContent = "反映: " + (x.j.sourcePath || "OK");
+              document.getElementById("system_prompt").value = x.j.text || "";
+            })
+            .catch(function () {
+              st.textContent = "通信エラーです。";
+              st.style.color = "#c00";
+            });
         });
       }
       document.getElementById("agent-form").addEventListener("submit", function (e) {
@@ -127,7 +175,8 @@
           pricePerRun: parseInt(document.getElementById("pricePerRun").value, 10) || 0,
           system_prompt: document.getElementById("system_prompt").value.trim() || undefined,
           creator_id: creatorId || undefined,
-          github_repo: (hiddenGithubRepo && hiddenGithubRepo.value) ? hiddenGithubRepo.value.trim() : undefined,
+          github_repo: document.getElementById("github_repo").value.trim(),
+          public_ui_url: document.getElementById("public_ui_url").value.trim(),
         };
         var resultEl = document.getElementById("agent-result");
         resultEl.textContent = "追加中…";

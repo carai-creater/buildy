@@ -22,6 +22,10 @@
         <h1>エージェントを編集</h1>
         <p id="edit-loading" class="page-lead">読み込み中…</p>
         <form id="agent-form" class="page-form" style="max-width: 32rem; display: none;">
+          <label for="github_repo">GitHub リポジトリ *</label>
+          <input id="github_repo" name="github_repo" type="text" required autocomplete="off" />
+          <label for="public_ui_url">ユーザー向け UI URL *（HTTPS）</label>
+          <input id="public_ui_url" name="public_ui_url" type="url" required autocomplete="off" />
           <label for="name">エージェント名 *</label>
           <input id="name" name="name" type="text" required />
           <label for="category">カテゴリ</label>
@@ -31,6 +35,11 @@
           <label for="pricePerRun">1実行あたりの料金（円）</label>
           <input id="pricePerRun" name="pricePerRun" type="number" min="0" />
           <label for="system_prompt">システムプロンプト（LLM用）</label>
+          <p style="margin: 0 0 0.5rem;">
+            <button type="button" id="btn-preview-github-prompt" class="btn secondary-btn" style="font-size: 14px;">GitHub からプレビュー</button>
+            <button type="button" id="btn-sync-github-save" class="btn secondary-btn" style="font-size: 14px;">GitHub と同期して保存</button>
+          </p>
+          <p id="github-prompt-status" style="font-size: 13px; color: var(--text-sub); min-height: 1.25em;"></p>
           <textarea id="system_prompt" name="system_prompt" rows="4"></textarea>
           <button type="submit" class="btn primary-btn">保存する</button>
         </form>
@@ -48,6 +57,70 @@
         const form = document.getElementById("agent-form");
         const loadingEl = document.getElementById("edit-loading");
         const resultEl = document.getElementById("agent-result");
+        const ghStatus = document.getElementById("github-prompt-status");
+        document.getElementById("btn-preview-github-prompt").addEventListener("click", function () {
+          var repo = document.getElementById("github_repo").value.trim();
+          ghStatus.textContent = "";
+          ghStatus.style.color = "";
+          if (!repo) {
+            ghStatus.textContent = "GitHub リポジトリを入力してください。";
+            ghStatus.style.color = "#c00";
+            return;
+          }
+          ghStatus.textContent = "取得中…";
+          fetch("/api/github/repo-prompt?repo=" + encodeURIComponent(repo))
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              if (!x.ok) {
+                ghStatus.textContent = (x.j && (x.j.message || x.j.error)) || "失敗";
+                ghStatus.style.color = "#c00";
+                return;
+              }
+              ghStatus.style.color = "";
+              ghStatus.textContent = "反映（未保存）: " + (x.j.sourcePath || "");
+              document.getElementById("system_prompt").value = x.j.text || "";
+            })
+            .catch(function () {
+              ghStatus.textContent = "通信エラー";
+              ghStatus.style.color = "#c00";
+            });
+        });
+        document.getElementById("btn-sync-github-save").addEventListener("click", function () {
+          ghStatus.textContent = "";
+          ghStatus.style.color = "";
+          ghStatus.textContent = "同期中…";
+          fetch("/api/agents/" + encodeURIComponent(id) + "/sync-github-prompt", { method: "POST" })
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              if (!x.ok) {
+                ghStatus.textContent = (x.j && (x.j.message || x.j.error)) || "同期に失敗";
+                ghStatus.style.color = "#c00";
+                return null;
+              }
+              ghStatus.style.color = "";
+              ghStatus.textContent = "保存しました（" + (x.j.sourcePath || "") + "）";
+              return fetch("/api/agents/" + encodeURIComponent(id)).then(function (r) {
+                return r.json();
+              });
+            })
+            .then(function (data) {
+              if (data && data.agent) {
+                document.getElementById("system_prompt").value = data.agent.system_prompt || "";
+              }
+            })
+            .catch(function () {
+              ghStatus.textContent = "通信エラー";
+              ghStatus.style.color = "#c00";
+            });
+        });
         fetch("/api/agents/" + encodeURIComponent(id))
           .then((r) => (r.ok ? r.json() : Promise.reject(r)))
           .then((data) => {
@@ -60,6 +133,8 @@
             document.getElementById("shortDescription").value = a.shortDescription || "";
             document.getElementById("pricePerRun").value = a.pricePerRun ?? 0;
             document.getElementById("system_prompt").value = a.system_prompt || "";
+            document.getElementById("github_repo").value = a.githubRepo || "";
+            document.getElementById("public_ui_url").value = a.publicUiUrl || "";
           })
           .catch(() => {
             loadingEl.textContent = "エージェントの取得に失敗しました。";
@@ -72,6 +147,8 @@
             shortDescription: document.getElementById("shortDescription").value.trim() || undefined,
             pricePerRun: parseInt(document.getElementById("pricePerRun").value, 10) || 0,
             system_prompt: document.getElementById("system_prompt").value.trim() || undefined,
+            github_repo: document.getElementById("github_repo").value.trim(),
+            public_ui_url: document.getElementById("public_ui_url").value.trim(),
           };
           resultEl.textContent = "保存中…";
           fetch("/api/agents/" + encodeURIComponent(id), {

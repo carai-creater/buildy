@@ -11,7 +11,9 @@
 
 `docs/supabase-tempo-payments.sql` を SQL Editor で実行してください。
 
-エージェントごとの利用 UI タイプは `docs/supabase-agent-ui-variant.sql`（任意、`ui_variant`: `chat` / `research`）。
+クリエイターが **ユーザー向け UI の URL** を登録するには `docs/supabase-agents-public-ui.sql`（`public_ui_url` カラム）も実行してください。
+
+エージェントごとの Buildy 内フォールバック UI は `docs/supabase-agent-ui-variant.sql`（任意、`ui_variant`: `chat` / `research`）。`public_ui_url` がある場合はチェックアウト後にそちらへ誘導されます。
 
 ## 2. 環境変数（Vercel / サーバー）
 
@@ -30,7 +32,7 @@
 1. `pay.html?agent=...` で `POST /api/payments/tempo/intent` → `checkoutKind`: `tempo` または `free`
 2. **有料**: ウォレットで `transferWithMemo` → `POST /api/payments/tempo/verify`
 3. **無料**: 「チェックアウト完了」→ `POST /api/payments/tempo/confirm-free`
-4. 返却された `accessToken` を `sessionStorage` に保存し、`agent-use.html` から `X-Buildy-Access-Token` 付きで `POST /api/agent/execute`
+4. 返却された `accessToken` を保存し、`public_ui_url` があるエージェントは **クリエイター提供 UI** へリダイレクト（URL ハッシュにトークン付与）。未設定のレガシー向けに `agent-use.html` から `X-Buildy-Access-Token` 付きで `POST /api/agent/execute` も可。詳細は [creator-ui.md](./creator-ui.md)。
 
 Vercel では `/api` が Express に集約されるため、**`POST /api/agent/execute` は `server.js` 内でも実装**しています（Next の Route と同等の処理）。
 

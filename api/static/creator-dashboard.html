@@ -197,6 +197,18 @@
             '<div class="cd-detail-block"><p class="cd-detail-label">想定売上（税抜）</p><p class="cd-detail-value">' +
             earn +
             "</p></div>" +
+            '<div class="cd-detail-block"><p class="cd-detail-label">GitHub リポジトリ</p><p class="cd-detail-value">' +
+            escapeHtml(agent.githubRepo || "—") +
+            "</p></div>" +
+            '<div class="cd-detail-block"><p class="cd-detail-label">ユーザー向け UI</p><p class="cd-detail-value">' +
+            (agent.publicUiUrl
+              ? '<a href="' +
+                String(agent.publicUiUrl).replace(/&/g, "&amp;").replace(/"/g, "&quot;") +
+                '" target="_blank" rel="noopener noreferrer">' +
+                escapeHtml(agent.publicUiUrl) +
+                "</a>"
+              : "—") +
+            "</p></div>" +
             '<div class="cd-detail-block"><p class="cd-detail-label">エージェント ID</p><pre class="cd-detail-snippet" id="cd-detail-id">' +
             escapeHtml(agent.id) +
             "</pre></div>" +
@@ -204,6 +216,9 @@
             '<a href="./agent-edit.html?id=' +
             encodeURIComponent(agent.id) +
             '" class="btn primary-btn">編集</a>' +
+            '<button type="button" class="btn secondary-btn agent-github-sync-btn" data-id="' +
+            escapeHtml(agent.id) +
+            '">GitHub プロンプト同期</button>' +
             '<button type="button" class="btn agent-delete-btn" data-id="' +
             escapeHtml(agent.id) +
             '">削除</button>' +
@@ -217,6 +232,29 @@
                 if (r.status === 204) location.reload();
                 else r.json().then(function (d) { alert(d.error || "削除に失敗しました"); });
               });
+            });
+          }
+          var syncGh = detailEl.querySelector(".agent-github-sync-btn");
+          if (syncGh) {
+            syncGh.addEventListener("click", function () {
+              var aid = syncGh.getAttribute("data-id");
+              if (!aid || !confirm("GitHub の .buildy/prompt.md 等で system_prompt を上書きしますか？")) return;
+              fetch("/api/agents/" + encodeURIComponent(aid) + "/sync-github-prompt", { method: "POST" })
+                .then(function (r) {
+                  return r.json().then(function (j) {
+                    return { ok: r.ok, j: j };
+                  });
+                })
+                .then(function (x) {
+                  alert(
+                    x.ok
+                      ? "同期しました: " + (x.j.sourcePath || "")
+                      : x.j.message || x.j.error || "失敗しました"
+                  );
+                })
+                .catch(function () {
+                  alert("通信エラー");
+                });
             });
           }
         }

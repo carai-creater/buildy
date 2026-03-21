@@ -20,9 +20,9 @@
       </header>
       <section class="page-main">
         <h1>Add agent</h1>
-        <p class="page-lead">List a new AI agent on the marketplace. <a href="./creators-register-en.html">Creator signup</a> is required first. You can pull details from a GitHub repo.</p>
+        <p class="page-lead">Publishing requires a <strong>GitHub repo</strong> and a <strong>public HTTPS URL</strong> for your end-user UI (e.g. GitHub Pages). Users complete checkout on Buildy, then use your UI to call <code>POST /api/agent/execute</code>. See <a href="./docs/creator-ui.md">docs/creator-ui.md</a>. <a href="./creators-register-en.html">Creator signup</a> is required first.</p>
         <div class="page-form" style="max-width: 32rem; margin-bottom: 1.5rem;">
-          <h2 style="font-size: 1rem; margin-bottom: 0.5rem;">Import from GitHub (optional)</h2>
+          <h2 style="font-size: 1rem; margin-bottom: 0.5rem;">Import from GitHub</h2>
           <label for="github-repo">GitHub repo URL or owner/repo</label>
           <div style="display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap;">
             <input id="github-repo" type="text" placeholder="https://github.com/owner/repo or owner/repo" style="flex: 1; min-width: 12rem;" />
@@ -31,6 +31,11 @@
           <p id="github-fetch-result" style="margin-top: 0.5rem; font-size: 14px; color: var(--text-sub);"></p>
         </div>
         <form id="agent-form" class="page-form" style="max-width: 32rem;">
+          <label for="github_repo">GitHub repository * (owner/repo or URL)</label>
+          <input id="github_repo" name="github_repo" type="text" required placeholder="octocat/Hello-World" autocomplete="off" />
+          <label for="public_ui_url">End-user UI URL * (HTTPS)</label>
+          <input id="public_ui_url" name="public_ui_url" type="url" required placeholder="https://you.github.io/your-agent/" autocomplete="off" />
+          <p class="page-note" style="font-size: 13px; color: var(--text-sub); margin-top: -0.25rem;">After checkout, users are sent here with <code>#buildy_access=…&amp;buildy_agent=…</code> in the URL hash.</p>
           <label for="name">Agent name *</label>
           <input id="name" name="name" type="text" required placeholder="e.g. Market research agent" />
           <label for="category">Category</label>
@@ -40,10 +45,16 @@
           <label for="pricePerRun">Price per run (JPY)</label>
           <input id="pricePerRun" name="pricePerRun" type="number" min="0" value="0" />
           <label for="system_prompt">System prompt (for the LLM)</label>
+          <p style="margin: 0 0 0.35rem; font-size: 13px; color: var(--text-sub);">
+            Load from <code>.buildy/prompt.md</code> or <code>README.md</code> in the repo (public repos only).
+          </p>
+          <p style="margin: 0 0 0.5rem;">
+            <button type="button" id="btn-load-github-prompt" class="btn secondary-btn" style="font-size: 14px;">Load prompt from GitHub</button>
+          </p>
+          <p id="github-prompt-status" style="font-size: 13px; color: var(--text-sub); min-height: 1.25em;"></p>
           <textarea id="system_prompt" name="system_prompt" rows="4" placeholder="You are a helpful assistant. ..."></textarea>
           <label for="creator_id">Creator ID (auto-filled when logged in; edit only for another account)</label>
           <input id="creator_id" name="creator_id" type="text" placeholder="uuid" autocomplete="off" />
-          <input id="github_repo" name="github_repo" type="hidden" />
           <button type="submit" class="btn primary-btn">Add agent</button>
         </form>
         <p id="agent-result" style="margin-top: 1rem;"></p>
@@ -73,7 +84,7 @@
       const githubRepoInput = document.getElementById("github-repo");
       const githubFetchBtn = document.getElementById("github-fetch-btn");
       const githubFetchResult = document.getElementById("github-fetch-result");
-      const hiddenGithubRepo = document.getElementById("github_repo");
+      const githubRepoField = document.getElementById("github_repo");
       if (githubFetchBtn && githubRepoInput) {
         githubFetchBtn.addEventListener("click", function () {
           var url = githubRepoInput.value.trim().replace(/\.git$/i, "").replace(/\/+$/, "").trim();
@@ -96,8 +107,10 @@
               var d = _.data;
               if (d.name) document.getElementById("name").value = d.name;
               if (d.description) document.getElementById("shortDescription").value = d.description;
-              if (d.full_name) hiddenGithubRepo.value = d.full_name;
-              else if (d.html_url) hiddenGithubRepo.value = d.html_url;
+              if (githubRepoField) {
+                if (d.full_name) githubRepoField.value = d.full_name;
+                else if (d.html_url) githubRepoField.value = d.html_url.replace(/^https?:\/\/github\.com\//i, "").replace(/\/$/, "");
+              }
               githubFetchResult.textContent = "Loaded: " + (d.full_name || d.name);
               githubFetchResult.style.color = "";
             })
@@ -106,6 +119,41 @@
               githubFetchResult.style.color = "#c00";
             })
             .finally(function () { githubFetchBtn.disabled = false; });
+        });
+      }
+      var btnGhPrompt = document.getElementById("btn-load-github-prompt");
+      if (btnGhPrompt) {
+        btnGhPrompt.addEventListener("click", function () {
+          var repo = document.getElementById("github_repo").value.trim();
+          var st = document.getElementById("github-prompt-status");
+          st.textContent = "";
+          st.style.color = "";
+          if (!repo) {
+            st.textContent = "Enter the GitHub repository first.";
+            st.style.color = "#c00";
+            return;
+          }
+          st.textContent = "Loading…";
+          fetch("/api/github/repo-prompt?repo=" + encodeURIComponent(repo))
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              if (!x.ok) {
+                st.textContent = (x.j && (x.j.message || x.j.error)) || "Failed to load";
+                st.style.color = "#c00";
+                return;
+              }
+              st.style.color = "";
+              st.textContent = "Loaded: " + (x.j.sourcePath || "OK");
+              document.getElementById("system_prompt").value = x.j.text || "";
+            })
+            .catch(function () {
+              st.textContent = "Network error.";
+              st.style.color = "#c00";
+            });
         });
       }
       document.getElementById("agent-form").addEventListener("submit", function (e) {
@@ -127,7 +175,8 @@
           pricePerRun: parseInt(document.getElementById("pricePerRun").value, 10) || 0,
           system_prompt: document.getElementById("system_prompt").value.trim() || undefined,
           creator_id: creatorId || undefined,
-          github_repo: (hiddenGithubRepo && hiddenGithubRepo.value) ? hiddenGithubRepo.value.trim() : undefined,
+          github_repo: document.getElementById("github_repo").value.trim(),
+          public_ui_url: document.getElementById("public_ui_url").value.trim(),
         };
         var resultEl = document.getElementById("agent-result");
         resultEl.textContent = "Adding…";

@@ -19,10 +19,15 @@
         <div id="state-loading" class="agent-use-loading"><p>Loading…</p></div>
         <div id="state-need-pay" class="agent-use-card agent-use-card--notice" style="display: none;">
           <h1 class="agent-use-heading" id="np-title"></h1>
-          <p class="agent-use-muted">Complete checkout to use this agent.</p>
+          <p class="agent-use-muted" id="np-muted">Complete checkout to use this agent.</p>
           <p style="margin-top: 1.25rem;">
             <a id="np-pay" href="#" class="btn primary-btn">Go to checkout</a>
           </p>
+        </div>
+
+        <div id="creator-ui-banner" class="agent-use-creator-banner" style="display: none;">
+          <p>This agent also has a <strong>creator-hosted app</strong>. You can keep using Buildy below, or open their UI in a new tab (same access).</p>
+          <button type="button" id="creator-ui-open-btn" class="btn secondary-btn">Open creator app</button>
         </div>
 
         <div id="ui-wrap-chat" class="agent-use-workspace" style="display: none;">
@@ -79,6 +84,15 @@
           }
         }
 
+        function openCreatorAppTab(publicUiUrl, accessToken, agId) {
+          try {
+            var u = new URL(String(publicUiUrl).trim());
+            u.hash =
+              "buildy_access=" + encodeURIComponent(accessToken) + "&buildy_agent=" + encodeURIComponent(agId);
+            window.open(u.toString(), "_blank", "noopener,noreferrer");
+          } catch (e) {}
+        }
+
         function runExecute(userText, logEl, errEl, placeholderEl, sendBtn) {
           errEl.textContent = "";
           if (sendBtn) sendBtn.disabled = true;
@@ -132,15 +146,42 @@
             var token = getToken();
             document.getElementById("state-loading").style.display = "none";
 
+            var pui = agent.publicUiUrl && String(agent.publicUiUrl).trim();
+
             if (!token) {
               document.getElementById("state-need-pay").style.display = "block";
               document.getElementById("np-title").textContent = agent.name;
               document.getElementById("np-pay").href = "./pay-en.html?agent=" + encodeURIComponent(agentId);
+              var npMuted = document.getElementById("np-muted");
+              if (npMuted) {
+                if (pui) {
+                  npMuted.innerHTML =
+                    'Complete checkout on Buildy first. Then use this page or the <a href="' +
+                    pui.replace(/"/g, "&quot;") +
+                    '" target="_blank" rel="noopener noreferrer">creator app</a>.';
+                } else {
+                  npMuted.textContent = "Complete checkout to use this agent.";
+                }
+              }
               return;
+            }
+
+            function wireCreatorBanner() {
+              if (!pui) return;
+              var b = document.getElementById("creator-ui-banner");
+              if (!b) return;
+              b.style.display = "block";
+              var btn = document.getElementById("creator-ui-open-btn");
+              if (btn) {
+                btn.onclick = function () {
+                  openCreatorAppTab(pui, getToken(), agentId);
+                };
+              }
             }
 
             var variant = agent.uiVariant || "chat";
             if (variant === "research") {
+              wireCreatorBanner();
               document.getElementById("ui-wrap-research").style.display = "flex";
               document.getElementById("rs-title").textContent = agent.name;
               var rsBtn = document.getElementById("rs-send");
@@ -157,6 +198,7 @@
                 document.getElementById("rs-input").value = "";
               });
             } else {
+              wireCreatorBanner();
               document.getElementById("ui-wrap-chat").style.display = "flex";
               document.getElementById("ch-title").textContent = agent.name;
               var chBtn = document.getElementById("ch-send");

@@ -242,6 +242,22 @@ button {
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
+.agent-use-creator-banner {
+  width: 100%;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 122, 26, 0.28);
+  background: linear-gradient(135deg, #fff8f2 0%, #ffffff 100%);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-sub);
+}
+
+.agent-use-creator-banner p {
+  margin: 0 0 0.65rem;
+}
+
 .agent-use-output-card {
   position: relative;
   border-radius: var(--radius-lg);

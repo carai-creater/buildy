@@ -61,6 +61,11 @@
                   '<a href="./pay-en.html?agent=' +
                   encodeURIComponent(a.id) +
                   '" class="btn primary-btn">Checkout to use</a>' +
+                  (a.publicUiUrl
+                    ? '<p class="page-note" style="margin-top:0.65rem;font-size:13px"><a href="' +
+                      String(a.publicUiUrl).replace(/&/g, "&amp;").replace(/"/g, "&quot;") +
+                      '" target="_blank" rel="noopener noreferrer">Creator-hosted UI</a> (after checkout)</p>'
+                    : "") +
                   "</article>"
                 );
               })

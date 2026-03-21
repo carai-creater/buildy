@@ -19,6 +19,27 @@ type ExecuteBody = {
   payment_access_token?: string;
 };
 
+/** クリエイターが別オリジンにホストした UI から呼ぶため */
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Buildy-Access-Token",
+};
+
+function withCors(headers?: HeadersInit): Record<string, string> {
+  const out: Record<string, string> = { ...CORS_HEADERS };
+  if (headers) {
+    new Headers(headers).forEach((v, k) => {
+      out[k] = v;
+    });
+  }
+  return out;
+}
+
+export function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: withCors() });
+}
+
 function getClientId(req: NextRequest): string {
   const forwarded = req.headers.get("x-forwarded-for");
   const ip = forwarded ? forwarded.split(",")[0].trim() : "unknown";
@@ -47,7 +68,7 @@ export async function POST(req: NextRequest) {
   if (!allowed) {
     return NextResponse.json(
       { error: "rate_limit_exceeded", message: "短時間のリクエストが多すぎます。しばらく待ってから再試行してください。" },
-      { status: 429, headers: { "X-RateLimit-Remaining": "0" } }
+      { status: 429, headers: withCors({ "X-RateLimit-Remaining": "0" }) }
     );
   }
 
@@ -57,7 +78,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json(
       { error: "invalid_body", message: "JSON body を送信してください。" },
-      { status: 400 }
+      { status: 400, headers: withCors() }
     );
   }
 
@@ -73,7 +94,7 @@ export async function POST(req: NextRequest) {
   if (!agent_id || typeof agent_id !== "string") {
     return NextResponse.json(
       { error: "agent_id_required", message: "agent_id は必須です。" },
-      { status: 400 }
+      { status: 400, headers: withCors() }
     );
   }
 
@@ -82,7 +103,7 @@ export async function POST(req: NextRequest) {
     console.error("[Buildy execute] OPENAI_API_KEY is not set");
     return NextResponse.json(
       { error: "server_error", message: "LLM が設定されていません。" },
-      { status: 500 }
+      { status: 500, headers: withCors() }
     );
   }
 
@@ -98,7 +119,7 @@ export async function POST(req: NextRequest) {
       console.warn("[Buildy execute] Agent not found:", agent_id, agentError?.message);
       return NextResponse.json(
         { error: "agent_not_found", message: "指定されたエージェントが見つかりません。" },
-        { status: 404 }
+        { status: 404, headers: withCors() }
       );
     }
 
@@ -113,7 +134,7 @@ export async function POST(req: NextRequest) {
     if (!grantCheck.ok) {
       return NextResponse.json(
         { error: "payment_required", message: grantCheck.message },
-        { status: grantCheck.status }
+        { status: grantCheck.status, headers: withCors() }
       );
     }
 
@@ -127,11 +148,10 @@ export async function POST(req: NextRequest) {
     } else {
       return NextResponse.json(
         { error: "messages_required", message: "messages または user_message を送信してください。" },
-        { status: 400 }
+        { status: 400, headers: withCors() }
       );
     }
 
-    // 会話履歴は Supabase から取得する拡張ポイント（conversation_id があればここで取得）
     const systemMessage: ChatMessage = { role: "system", content: systemPrompt };
     const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       systemMessage,
@@ -172,12 +192,12 @@ export async function POST(req: NextRequest) {
       });
 
       return new Response(readable, {
-        headers: {
+        headers: withCors({
           "Content-Type": "text/event-stream; charset=utf-8",
           "Cache-Control": "no-cache, no-transform",
           Connection: "keep-alive",
           "X-RateLimit-Remaining": String(remaining),
-        },
+        }),
       });
     }
 
@@ -190,7 +210,7 @@ export async function POST(req: NextRequest) {
     const content = completion.choices?.[0]?.message?.content ?? "";
     return NextResponse.json(
       { content, conversation_id },
-      { headers: { "X-RateLimit-Remaining": String(remaining) } }
+      { headers: withCors({ "X-RateLimit-Remaining": String(remaining) }) }
     );
   } catch (err) {
     console.error("[Buildy execute] Error:", err);
@@ -199,7 +219,7 @@ export async function POST(req: NextRequest) {
         error: "execution_failed",
         message: err instanceof Error ? err.message : "エージェント実行に失敗しました。",
       },
-      { status: 500 }
+      { status: 500, headers: withCors() }
     );
   }
 }
