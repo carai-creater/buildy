@@ -15,13 +15,19 @@
           <a href="./agents.html">エージェント</a>
           <a href="./creator-dashboard.html">ダッシュボード</a>
           <a href="./agent-add.html">エージェントを追加</a>
+          <a href="./creators-login.html">ログイン</a>
+          <a href="./creators-register-en.html" class="page-lang">English</a>
         </nav>
       </header>
       <section class="page-main">
         <h1>クリエイター登録</h1>
-        <p class="page-lead">Buildy でエージェントを公開するには、まずクリエイターとして登録してください。</p>
+        <p class="page-lead">Buildy でエージェントを公開するには、まずクリエイターとして登録してください。すでに登録済みの方は <a href="./creators-login.html">ログイン</a> へ。</p>
         <p id="register-loading" class="page-lead" style="margin-bottom: 1rem; color: var(--text-sub);">接続設定を確認しています…</p>
         <div id="register-with-auth" style="display: none;">
+          <label class="page-checkbox" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; cursor: pointer; max-width: 28rem;">
+            <input type="checkbox" id="register-remember-me" checked />
+            <span>登録後もログイン状態を保持する（推奨）</span>
+          </label>
           <p class="page-lead" style="margin-bottom: 1rem;">Googleで登録するか、メール・パスワードで登録してください。</p>
           <p style="margin-bottom: 1rem;">
             <button type="button" id="google-signup-btn" class="btn primary-btn" style="display: inline-flex; align-items: center; gap: 0.5rem;">
@@ -53,6 +59,7 @@
         <p id="register-result" style="margin-top: 1rem; min-height: 1.5em;"></p>
       </section>
     </main>
+    <script src="./auth-storage.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script>
       (function () {
@@ -74,13 +81,24 @@
             if (config.supabaseUrl && config.supabaseAnonKey) {
               withAuth.style.display = "block";
               noAuth.style.display = "none";
-              var redirectTo = window.location.origin + (window.location.pathname.replace(/[^/]+$/, "") || "/") + "auth-callback.html";
-              var supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+              var redirectTo =
+                window.location.origin +
+                (window.location.pathname.replace(/[^/]+$/, "") || "/") +
+                "auth-callback.html?welcome=1";
               var googleBtn = document.getElementById("google-signup-btn");
               if (googleBtn) {
                 googleBtn.addEventListener("click", function () {
                   resultEl.textContent = "Googleにリダイレクトしています…";
                   resultEl.style.color = "";
+                  var rememberReg = document.getElementById("register-remember-me");
+                  if (typeof window.buildySetRememberSession === "function") {
+                    window.buildySetRememberSession(rememberReg ? rememberReg.checked : true);
+                  }
+                  var storage =
+                    typeof window.buildyGetAuthStorage === "function" ? window.buildyGetAuthStorage() : localStorage;
+                  var supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+                    auth: { storage: storage, persistSession: true, autoRefreshToken: true },
+                  });
                   supabaseClient.auth.signInWithOAuth({
                     provider: "google",
                     options: { redirectTo: redirectTo },
@@ -115,8 +133,19 @@
                   resultEl.style.color = "";
                   var btn = formAuth.querySelector('button[type="submit"]');
                   if (btn) btn.disabled = true;
-                  var redirectTo = window.location.origin + (window.location.pathname.replace(/[^/]+$/, "") || "/") + "auth-callback.html";
-                  window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey).auth.signUp({
+                  var redirectTo =
+                    window.location.origin +
+                    (window.location.pathname.replace(/[^/]+$/, "") || "/") +
+                    "auth-callback.html?welcome=1";
+                  var rememberReg = document.getElementById("register-remember-me");
+                  if (typeof window.buildySetRememberSession === "function") {
+                    window.buildySetRememberSession(rememberReg ? rememberReg.checked : true);
+                  }
+                  var storage =
+                    typeof window.buildyGetAuthStorage === "function" ? window.buildyGetAuthStorage() : localStorage;
+                  window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+                    auth: { storage: storage, persistSession: true, autoRefreshToken: true },
+                  }).auth.signUp({
                     email: email,
                     password: password,
                     options: {

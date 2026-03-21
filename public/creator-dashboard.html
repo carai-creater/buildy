@@ -3,242 +3,414 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>マイページ | Buildy</title>
+    <title>クリエイター マイページ | Buildy</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="page">
+    <main class="page page--creator-studio">
       <header class="page-header">
         <a href="./index-ja.html" class="page-logo">Buildy</a>
         <nav class="page-nav">
           <a href="./index-ja.html">トップ</a>
-          <a href="./agents.html">エージェント一覧</a>
-          <a href="./creator-dashboard.html">ダッシュボード</a>
-          <a href="./agent-add.html">エージェントを追加</a>
+          <a href="./agents.html">公開一覧</a>
+          <a href="./agent-add.html">エージェント追加</a>
+          <a href="./creator-dashboard-en.html" class="page-lang">English</a>
         </nav>
       </header>
       <section class="page-main">
-        <div id="dashboard-please-register" class="page-empty" style="display: none;">
-          <h1>クリエイターダッシュボード</h1>
-          <p>ダッシュボードを利用するには、まずクリエイター登録をしてください。</p>
-          <p><a href="./creators-register.html" class="btn primary-btn">クリエイター登録</a></p>
+        <div id="dashboard-please-register" class="page-empty" style="display: none; padding: 3rem 1.5rem;">
+          <h1>クリエイター マイページ</h1>
+          <p>ログインするか、はじめての方はクリエイター登録をしてください。</p>
+          <p style="display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; margin-top: 1rem;">
+            <a href="./creators-login.html" class="btn primary-btn">ログイン</a>
+            <a href="./creators-register.html" class="btn ghost-btn">新規登録</a>
+          </p>
         </div>
-        <div id="dashboard-content" style="display: none;" class="dashboard-wrap">
-          <aside class="dashboard-sidebar">
-            <div class="sidebar-logo">Buildy</div>
-            <a href="#section-agents" class="dashboard-nav-item" data-section="section-agents">自分のエージェント</a>
-            <a href="#section-earnings" class="dashboard-nav-item" data-section="section-earnings">収益・分析</a>
-            <a href="#section-profile" class="dashboard-nav-item" data-section="section-profile">プロフィール設定</a>
-            <a href="#section-other" class="dashboard-nav-item" data-section="section-other">その他</a>
+
+        <div id="dashboard-content" style="display: none;" class="cd-shell">
+          <aside class="cd-sidebar" aria-label="マイページメニュー">
+            <div class="cd-sidebar-brand">Buildy</div>
+            <div class="cd-sidebar-section">
+              <div class="cd-sidebar-label">メニュー</div>
+              <button type="button" class="cd-sidebar-link active" data-tab="tab-agents">エージェント</button>
+              <button type="button" class="cd-sidebar-link" data-tab="tab-analytics">収益・分析</button>
+              <button type="button" class="cd-sidebar-link" data-tab="tab-profile">プロフィール</button>
+              <button type="button" class="cd-sidebar-link" data-tab="tab-other">その他</button>
+            </div>
+            <div class="cd-sidebar-footer">
+              <a href="./index-ja.html">← トップへ戻る</a>
+            </div>
           </aside>
-          <div class="dashboard-main">
-            <h1>マイページ</h1>
-            <p id="dashboard-welcome" class="page-lead"></p>
-            <div id="dashboard-after-register" style="display: none; margin-bottom: 1.5rem; padding: 1rem; background: var(--accent-soft); border-radius: 8px;">
-              <p style="margin: 0;">登録が完了しました。下の「＋ エージェントを追加」からエージェントを登録してください。</p>
+
+          <div class="cd-workspace">
+            <header class="cd-workspace-head">
+              <h1>マイページ</h1>
+              <p id="dashboard-welcome" class="page-lead"></p>
+            </header>
+
+            <div id="tab-agents" class="cd-tab-panel is-active">
+              <div id="dashboard-after-register" class="cd-banner" style="display: none;">
+                <p>登録が完了しました。右の一覧に反映される「＋ 追加」からエージェントを登録してください。</p>
+              </div>
+              <div class="cd-toolbar">
+                <span class="cd-toolbar-title">アップロードしたエージェント</span>
+                <a href="./agent-add.html" class="btn primary-btn">＋ エージェントを追加</a>
+              </div>
+              <div class="cd-panel">
+                <div class="cd-split">
+                  <div class="cd-agent-list-wrap">
+                    <div id="cd-agent-list" class="cd-agent-list" role="listbox" aria-label="エージェント一覧"></div>
+                  </div>
+                  <div class="cd-agent-detail-wrap">
+                    <div id="cd-agent-detail" class="cd-agent-detail"></div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <section id="section-agents" class="dashboard-section">
-              <h2>自分のエージェント</h2>
-              <p><a href="./agent-add.html" class="btn primary-btn">＋ エージェントを追加</a></p>
-              <div id="dashboard-agents" class="page-card-grid"></div>
-            </section>
-
-            <section id="section-earnings" class="dashboard-section">
-              <h2>収益・分析</h2>
-              <div class="dashboard-analytics-summary">
-                <div class="dashboard-analytics-item">
-                  <p class="dashboard-analytics-label">総実行数</p>
-                  <p id="dashboard-total-runs" class="dashboard-analytics-value">0 回</p>
+            <div id="tab-analytics" class="cd-tab-panel">
+              <div class="dashboard-section" style="margin: 0; border-radius: 8px;">
+                <h2 style="margin-top: 0;">収益・分析</h2>
+                <div class="dashboard-analytics-summary">
+                  <div class="dashboard-analytics-item">
+                    <p class="dashboard-analytics-label">総実行数</p>
+                    <p id="dashboard-total-runs" class="dashboard-analytics-value">0 回</p>
+                  </div>
+                  <div class="dashboard-analytics-item">
+                    <p class="dashboard-analytics-label">総売上（税抜）</p>
+                    <p id="dashboard-total-earnings" class="dashboard-analytics-value">¥0</p>
+                  </div>
                 </div>
-                <div class="dashboard-analytics-item">
-                  <p class="dashboard-analytics-label">総売上（税抜）</p>
-                  <p id="dashboard-total-earnings" class="dashboard-analytics-value">¥0</p>
+                <h3 class="dashboard-analytics-subtitle">エージェント別内訳</h3>
+                <div id="dashboard-earnings-by-agent" class="dashboard-analytics-table-wrap">
+                  <p class="page-empty" style="margin: 0;">内訳を読み込み中…</p>
                 </div>
+                <p style="margin: 1rem 0 0; font-size: 13px; color: var(--text-sub);">
+                  ※ 実行ごとに記録された回数・想定売上です。決済連携後に実際の振込額が反映されます。
+                </p>
               </div>
-              <h3 class="dashboard-analytics-subtitle">エージェント別内訳</h3>
-              <div id="dashboard-earnings-by-agent" class="dashboard-analytics-table-wrap">
-                <p class="page-empty" style="margin: 0;">内訳を読み込み中…</p>
+            </div>
+
+            <div id="tab-profile" class="cd-tab-panel">
+              <div class="dashboard-section" style="margin: 0; border-radius: 8px; max-width: 480px;">
+                <h2 style="margin-top: 0;">プロフィール設定</h2>
+                <form id="profile-form" class="dashboard-profile-form">
+                  <label for="profile-name">表示名</label>
+                  <input id="profile-name" name="name" type="text" required placeholder="山田 太郎" autocomplete="name" />
+                  <label for="profile-email">メールアドレス</label>
+                  <input id="profile-email" name="email" type="email" required placeholder="you@example.com" autocomplete="email" />
+                  <button type="submit" class="save-btn">保存する</button>
+                </form>
+                <p id="profile-result" class="dashboard-profile-result"></p>
               </div>
-              <p style="margin: 1rem 0 0; font-size: 13px; color: var(--text-sub);">※ 実行ごとに記録された回数・想定売上です。決済連携後に実際の振込額が反映されます。</p>
-            </section>
+            </div>
 
-            <section id="section-profile" class="dashboard-section">
-              <h2>プロフィール設定</h2>
-              <form id="profile-form" class="dashboard-profile-form">
-                <label for="profile-name">表示名</label>
-                <input id="profile-name" name="name" type="text" required placeholder="山田 太郎" autocomplete="name" />
-                <label for="profile-email">メールアドレス</label>
-                <input id="profile-email" name="email" type="email" required placeholder="you@example.com" autocomplete="email" />
-                <button type="submit" class="save-btn">保存する</button>
-              </form>
-              <p id="profile-result" class="dashboard-profile-result"></p>
-            </section>
-
-            <section id="section-other" class="dashboard-section">
-              <h2>その他</h2>
-              <ul style="margin: 0; padding-left: 1.25rem; font-size: 14px;">
-                <li><a href="./agent-add.html">エージェントを追加する</a></li>
-                <li><a href="./agents.html">エージェント一覧（公開ページ）</a></li>
-                <li><a href="./index-ja.html">トップページ</a></li>
-              </ul>
-              <p style="margin-top: 1rem;">
-                <button type="button" id="dashboard-logout" class="btn">ログアウト（この端末の登録情報を解除）</button>
-              </p>
-            </section>
+            <div id="tab-other" class="cd-tab-panel">
+              <div class="dashboard-section" style="margin: 0; border-radius: 8px;">
+                <h2 style="margin-top: 0;">その他</h2>
+                <ul style="margin: 0; padding-left: 1.25rem; font-size: 14px;">
+                  <li><a href="./agent-add.html">エージェントを追加する</a></li>
+                  <li><a href="./agents.html">公開エージェント一覧</a></li>
+                  <li><a href="./index-ja.html">トップページ</a></li>
+                </ul>
+                <p style="margin-top: 1.25rem;">
+                  <button type="button" id="dashboard-logout" class="btn">ログアウト（保存したログイン情報も消去）</button>
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
     </main>
+    <script src="./auth-storage.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script>
       (function () {
-        var creatorId = (function () {
-          try {
-            return localStorage.getItem("buildy_creator_id") || "";
-          } catch (_) {
-            return "";
+        var creatorId =
+          typeof window.buildyGetStoredCreatorId === "function"
+            ? window.buildyGetStoredCreatorId()
+            : (function () {
+                try {
+                  return localStorage.getItem("buildy_creator_id") || sessionStorage.getItem("buildy_creator_id") || "";
+                } catch (_) {
+                  return "";
+                }
+              })();
+
+        var pleaseRegister = document.getElementById("dashboard-please-register");
+        var content = document.getElementById("dashboard-content");
+        var welcomeEl = document.getElementById("dashboard-welcome");
+        var listEl = document.getElementById("cd-agent-list");
+        var detailEl = document.getElementById("cd-agent-detail");
+
+        var dashboardAgents = [];
+        var earningsByAgentId = {};
+
+        function escapeHtml(s) {
+          var div = document.createElement("div");
+          div.textContent = s == null ? "" : s;
+          return div.innerHTML;
+        }
+
+        function switchTab(tabId) {
+          document.querySelectorAll(".cd-tab-panel").forEach(function (p) {
+            p.classList.toggle("is-active", p.id === tabId);
+          });
+          document.querySelectorAll(".cd-sidebar-link").forEach(function (btn) {
+            btn.classList.toggle("active", btn.getAttribute("data-tab") === tabId);
+          });
+        }
+
+        document.querySelectorAll(".cd-sidebar-link").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var tab = btn.getAttribute("data-tab");
+            if (tab) switchTab(tab);
+          });
+        });
+
+        function renderDetail(agent) {
+          if (!agent) {
+            detailEl.innerHTML =
+              '<div class="cd-agent-detail-empty">左の一覧からエージェントを選択するか、<a href="./agent-add.html">追加</a>してください。</div>';
+            return;
           }
-        })();
-        const pleaseRegister = document.getElementById("dashboard-please-register");
-        const content = document.getElementById("dashboard-content");
-        const welcomeEl = document.getElementById("dashboard-welcome");
-        const agentsEl = document.getElementById("dashboard-agents");
+          var stat = earningsByAgentId[agent.id] || {};
+          var runsText = stat.runs != null && stat.runs !== "" ? Number(stat.runs) + " 回" : "—";
+          var earn = stat.earnings != null ? "¥" + Number(stat.earnings).toLocaleString() : "—";
+          var price = "¥" + Number(agent.pricePerRun || 0).toLocaleString() + " / 実行";
+          detailEl.innerHTML =
+            '<div class="cd-detail-badge">' +
+            escapeHtml(agent.category || "未分類") +
+            "</div>" +
+            '<h2 class="cd-detail-title">' +
+            escapeHtml(agent.name) +
+            "</h2>" +
+            '<div class="cd-detail-block"><p class="cd-detail-label">説明</p><p class="cd-detail-value">' +
+            escapeHtml(agent.shortDescription || "（なし）") +
+            "</p></div>" +
+            '<div class="cd-detail-block"><p class="cd-detail-label">料金</p><p class="cd-detail-value">' +
+            escapeHtml(price) +
+            "</p></div>" +
+            '<div class="cd-detail-block"><p class="cd-detail-label">実行数（記録ベース）</p><p class="cd-detail-value">' +
+            runsText +
+            "</p></div>" +
+            '<div class="cd-detail-block"><p class="cd-detail-label">想定売上（税抜）</p><p class="cd-detail-value">' +
+            earn +
+            "</p></div>" +
+            '<div class="cd-detail-block"><p class="cd-detail-label">エージェント ID</p><pre class="cd-detail-snippet" id="cd-detail-id">' +
+            escapeHtml(agent.id) +
+            "</pre></div>" +
+            '<div class="cd-detail-actions">' +
+            '<a href="./agent-edit.html?id=' +
+            encodeURIComponent(agent.id) +
+            '" class="btn primary-btn">編集</a>' +
+            '<button type="button" class="btn agent-delete-btn" data-id="' +
+            escapeHtml(agent.id) +
+            '">削除</button>' +
+            "</div>";
+          var del = detailEl.querySelector(".agent-delete-btn");
+          if (del) {
+            del.addEventListener("click", function () {
+              var id = del.getAttribute("data-id");
+              if (!id || !confirm("このエージェントを削除しますか？")) return;
+              fetch("/api/agents/" + encodeURIComponent(id), { method: "DELETE" }).then(function (r) {
+                if (r.status === 204) location.reload();
+                else r.json().then(function (d) { alert(d.error || "削除に失敗しました"); });
+              });
+            });
+          }
+        }
+
+        function selectAgent(id) {
+          document.querySelectorAll(".cd-agent-row").forEach(function (row) {
+            row.classList.toggle("is-selected", row.getAttribute("data-agent-id") === id);
+          });
+          var agent = dashboardAgents.find(function (a) { return a.id === id; });
+          renderDetail(agent || null);
+        }
+
+        function renderAgentList(agents) {
+          if (!agents.length) {
+            listEl.innerHTML =
+              '<p class="page-empty" style="text-align: center; padding: 1.5rem 0.75rem; font-size: 14px;">まだエージェントがありません。<br /><a href="./agent-add.html">追加する</a></p>';
+            renderDetail(null);
+            return;
+          }
+          listEl.innerHTML = agents
+            .map(function (a) {
+              return (
+                '<button type="button" class="cd-agent-row" role="option" data-agent-id="' +
+                escapeHtml(a.id) +
+                '">' +
+                '<p class="cd-agent-row-name">' +
+                escapeHtml(a.name) +
+                "</p>" +
+                '<p class="cd-agent-row-meta">' +
+                escapeHtml(a.category || "未分類") +
+                " · ¥" +
+                Number(a.pricePerRun || 0).toLocaleString() +
+                "/回</p>" +
+                "</button>"
+              );
+            })
+            .join("");
+          listEl.querySelectorAll(".cd-agent-row").forEach(function (row) {
+            row.addEventListener("click", function () {
+              selectAgent(row.getAttribute("data-agent-id"));
+            });
+          });
+          selectAgent(agents[0].id);
+        }
 
         function loadDashboard(id) {
           creatorId = id;
           fetch("/api/creators/" + encodeURIComponent(creatorId))
-          .then((r) => (r.ok ? r.json() : Promise.reject(r)))
-          .then((data) => {
-            content.style.display = "block";
-            welcomeEl.textContent = "ようこそ、" + (data.creator ? data.creator.name : "") + " さん。";
-            var afterRegister = document.getElementById("dashboard-after-register");
-            if (afterRegister && (window.location.search || "").indexOf("registered=1") !== -1) {
-              afterRegister.style.display = "block";
-            }
-            var earnings = data.earnings || {};
-            var totalRuns = earnings.totalRuns != null ? earnings.totalRuns : 0;
-            var totalEarnings = earnings.totalEarnings != null ? earnings.totalEarnings : 0;
-            var runsEl = document.getElementById("dashboard-total-runs");
-            var earnEl = document.getElementById("dashboard-total-earnings");
-            if (runsEl) runsEl.textContent = totalRuns + " 回";
-            if (earnEl) earnEl.textContent = "¥" + Number(totalEarnings).toLocaleString();
-            var byAgentEl = document.getElementById("dashboard-earnings-by-agent");
-            if (byAgentEl) {
-              var byAgent = earnings.byAgent || [];
-              if (byAgent.length === 0) {
-                byAgentEl.innerHTML = "<p class=\"page-empty\" style=\"margin: 0;\">エージェントがまだないか、実行履歴がありません。</p>";
-              } else {
-                byAgentEl.innerHTML =
-                  "<table class=\"dashboard-analytics-table\"><thead><tr><th>エージェント</th><th>実行数</th><th>単価</th><th>売上（税抜）</th></tr></thead><tbody>" +
-                  byAgent.map(function (a) {
-                    return "<tr><td>" + escapeHtml(a.agentName || a.agentId) + "</td><td>" + (a.runs || 0) + " 回</td><td>¥" + Number(a.pricePerRun || 0).toLocaleString() + "</td><td>¥" + Number(a.earnings || 0).toLocaleString() + "</td></tr>";
-                  }).join("") +
-                  "</tbody></table>";
+            .then(function (r) {
+              return r.ok ? r.json() : Promise.reject(r);
+            })
+            .then(function (data) {
+              content.style.display = "flex";
+              welcomeEl.textContent = "ようこそ、" + (data.creator ? data.creator.name : "") + " さん。";
+              var afterRegister = document.getElementById("dashboard-after-register");
+              if (afterRegister && (window.location.search || "").indexOf("registered=1") !== -1) {
+                afterRegister.style.display = "block";
               }
-            }
-            var profileName = document.getElementById("profile-name");
-            var profileEmail = document.getElementById("profile-email");
-            if (profileName && data.creator) profileName.value = data.creator.name || "";
-            if (profileEmail && data.creator) profileEmail.value = data.creator.email || "";
-            const agents = data.agents || [];
-            if (agents.length === 0) {
-              agentsEl.innerHTML = '<p class="page-empty">まだエージェントがありません。<a href="./agent-add.html">エージェントを追加</a>してください。</p>';
-              return;
-            }
-            agentsEl.innerHTML = agents
-              .map(
-                (a) => `
-              <article class="page-agent-card">
-                <span class="badge subtle">${escapeHtml(a.category)}</span>
-                <h2>${escapeHtml(a.name)}</h2>
-                <p class="page-agent-desc">${escapeHtml(a.shortDescription)}</p>
-                <p class="page-agent-price">¥${Number(a.pricePerRun)} / 実行</p>
-                <p style="margin-top: 0.75rem;">
-                  <a href="./agent-edit.html?id=${encodeURIComponent(a.id)}" class="btn" style="margin-right: 0.5rem;">編集</a>
-                  <button type="button" class="btn agent-delete-btn" data-id="${escapeHtml(a.id)}">削除</button>
-                </p>
-              </article>
-            `
-              )
-              .join("");
-            agentsEl.querySelectorAll(".agent-delete-btn").forEach((btn) => {
-              btn.addEventListener("click", function () {
-                const id = this.getAttribute("data-id");
-                if (!id || !confirm("このエージェントを削除しますか？")) return;
-                fetch("/api/agents/" + encodeURIComponent(id), { method: "DELETE" }).then((r) => {
-                  if (r.status === 204) location.reload();
-                  else r.json().then((d) => alert(d.error || "削除に失敗しました"));
-                });
+              var earnings = data.earnings || {};
+              var totalRuns = earnings.totalRuns != null ? earnings.totalRuns : 0;
+              var totalEarnings = earnings.totalEarnings != null ? earnings.totalEarnings : 0;
+              var runsEl = document.getElementById("dashboard-total-runs");
+              var earnEl = document.getElementById("dashboard-total-earnings");
+              if (runsEl) runsEl.textContent = totalRuns + " 回";
+              if (earnEl) earnEl.textContent = "¥" + Number(totalEarnings).toLocaleString();
+
+              earningsByAgentId = {};
+              (earnings.byAgent || []).forEach(function (row) {
+                if (row.agentId) earningsByAgentId[row.agentId] = row;
               });
-            });
-            var profileForm = document.getElementById("profile-form");
-            var profileResult = document.getElementById("profile-result");
-            if (profileForm && profileResult) {
-              profileForm.addEventListener("submit", function (e) {
-                e.preventDefault();
-                var nameEl = document.getElementById("profile-name");
-                var emailEl = document.getElementById("profile-email");
-                var name = (nameEl && nameEl.value) ? nameEl.value.trim() : "";
-                var email = (emailEl && emailEl.value) ? emailEl.value.trim() : "";
-                if (!name || !email) {
-                  profileResult.textContent = "表示名とメールアドレスを入力してください。";
-                  profileResult.className = "dashboard-profile-result error";
-                  return;
+
+              var byAgentEl = document.getElementById("dashboard-earnings-by-agent");
+              if (byAgentEl) {
+                var byAgent = earnings.byAgent || [];
+                if (byAgent.length === 0) {
+                  byAgentEl.innerHTML =
+                    '<p class="page-empty" style="margin: 0;">エージェントがまだないか、実行履歴がありません。</p>';
+                } else {
+                  byAgentEl.innerHTML =
+                    '<table class="dashboard-analytics-table"><thead><tr><th>エージェント</th><th>実行数</th><th>単価</th><th>売上（税抜）</th></tr></thead><tbody>' +
+                    byAgent
+                      .map(function (a) {
+                        return (
+                          "<tr><td>" +
+                          escapeHtml(a.agentName || a.agentId) +
+                          "</td><td>" +
+                          (a.runs || 0) +
+                          " 回</td><td>¥" +
+                          Number(a.pricePerRun || 0).toLocaleString() +
+                          "</td><td>¥" +
+                          Number(a.earnings || 0).toLocaleString() +
+                          "</td></tr>"
+                        );
+                      })
+                      .join("") +
+                    "</tbody></table>";
                 }
-                var saveBtn = profileForm.querySelector('button[type="submit"]');
-                if (saveBtn) saveBtn.disabled = true;
-                profileResult.textContent = "保存中…";
-                profileResult.className = "dashboard-profile-result";
-                fetch("/api/creators/" + encodeURIComponent(creatorId), {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ name: name, email: email }),
-                })
-                  .then(function (r) {
-                    if (!r.ok) {
-                      return r.json().then(function (d) {
-                        throw new Error((d && d.error) ? d.error : "保存に失敗しました");
-                      }).catch(function (jsonErr) {
-                        if (jsonErr.message && jsonErr.message !== "Unexpected end of JSON input") throw jsonErr;
-                        throw new Error("保存に失敗しました（" + r.status + "）");
-                      });
-                    }
-                    return r.json();
-                  })
-                  .then(function () {
-                    profileResult.textContent = "保存しました。";
-                    profileResult.className = "dashboard-profile-result success";
-                    if (welcomeEl) welcomeEl.textContent = "ようこそ、" + name + " さん。";
-                    if (saveBtn) saveBtn.disabled = false;
-                  })
-                  .catch(function (err) {
-                    profileResult.textContent = "エラー: " + (err.message || "保存に失敗しました");
+              }
+
+              var profileName = document.getElementById("profile-name");
+              var profileEmail = document.getElementById("profile-email");
+              if (profileName && data.creator) profileName.value = data.creator.name || "";
+              if (profileEmail && data.creator) profileEmail.value = data.creator.email || "";
+
+              dashboardAgents = data.agents || [];
+              renderAgentList(dashboardAgents);
+
+              var profileForm = document.getElementById("profile-form");
+              var profileResult = document.getElementById("profile-result");
+              if (profileForm && profileResult) {
+                profileForm.addEventListener("submit", function (e) {
+                  e.preventDefault();
+                  var nameEl = document.getElementById("profile-name");
+                  var emailEl = document.getElementById("profile-email");
+                  var name = nameEl && nameEl.value ? nameEl.value.trim() : "";
+                  var email = emailEl && emailEl.value ? emailEl.value.trim() : "";
+                  if (!name || !email) {
+                    profileResult.textContent = "表示名とメールアドレスを入力してください。";
                     profileResult.className = "dashboard-profile-result error";
-                    if (saveBtn) saveBtn.disabled = false;
-                  });
-              });
-            }
-            var logoutBtn = document.getElementById("dashboard-logout");
-            if (logoutBtn) {
-              logoutBtn.addEventListener("click", function () {
-                try { localStorage.removeItem("buildy_creator_id"); } catch (_) {}
-                location.reload();
-              });
-            }
-            function setActiveNav() {
-              var hash = (window.location.hash || "#section-agents").replace("#", "");
-              document.querySelectorAll(".dashboard-nav-item").forEach(function (a) {
-                a.classList.toggle("active", (a.getAttribute("data-section") || "") === hash);
-              });
-            }
-            setActiveNav();
-            window.addEventListener("hashchange", setActiveNav);
-          })
-          .catch(() => {
-            pleaseRegister.style.display = "block";
-            pleaseRegister.innerHTML = "<h1>クリエイターダッシュボード</h1><p>登録情報の取得に失敗しました。再度<a href=\"./creators-register.html\">クリエイター登録</a>をするか、しばらく経ってからアクセスしてください。</p>";
-          });
+                    return;
+                  }
+                  var saveBtn = profileForm.querySelector('button[type="submit"]');
+                  if (saveBtn) saveBtn.disabled = true;
+                  profileResult.textContent = "保存中…";
+                  profileResult.className = "dashboard-profile-result";
+                  fetch("/api/creators/" + encodeURIComponent(creatorId), {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: name, email: email }),
+                  })
+                    .then(function (r) {
+                      if (!r.ok) {
+                        return r
+                          .json()
+                          .then(function (d) {
+                            throw new Error((d && d.error) ? d.error : "保存に失敗しました");
+                          })
+                          .catch(function (jsonErr) {
+                            if (jsonErr.message && jsonErr.message !== "Unexpected end of JSON input") throw jsonErr;
+                            throw new Error("保存に失敗しました（" + r.status + "）");
+                          });
+                      }
+                      return r.json();
+                    })
+                    .then(function () {
+                      profileResult.textContent = "保存しました。";
+                      profileResult.className = "dashboard-profile-result success";
+                      if (welcomeEl) welcomeEl.textContent = "ようこそ、" + name + " さん。";
+                      if (saveBtn) saveBtn.disabled = false;
+                    })
+                    .catch(function (err) {
+                      profileResult.textContent = "エラー: " + (err.message || "保存に失敗しました");
+                      profileResult.className = "dashboard-profile-result error";
+                      if (saveBtn) saveBtn.disabled = false;
+                    });
+                });
+              }
+
+              var logoutBtn = document.getElementById("dashboard-logout");
+              if (logoutBtn) {
+                logoutBtn.addEventListener("click", function () {
+                  fetch("/api/config")
+                    .then(function (r) { return r.json(); })
+                    .then(function (config) {
+                      if (config.supabaseUrl && config.supabaseAnonKey) {
+                        var storage =
+                          typeof window.buildyGetAuthStorage === "function"
+                            ? window.buildyGetAuthStorage()
+                            : localStorage;
+                        var sb = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+                          auth: { storage: storage, persistSession: true, autoRefreshToken: true },
+                        });
+                        return sb.auth.signOut();
+                      }
+                    })
+                    .catch(function () {})
+                    .finally(function () {
+                      if (typeof window.buildyClearCreatorSession === "function") window.buildyClearCreatorSession();
+                      else {
+                        try {
+                          localStorage.removeItem("buildy_creator_id");
+                          sessionStorage.removeItem("buildy_creator_id");
+                        } catch (_) {}
+                      }
+                      location.reload();
+                    });
+                });
+              }
+            })
+            .catch(function () {
+              pleaseRegister.style.display = "block";
+              pleaseRegister.innerHTML =
+                '<h1>クリエイター マイページ</h1><p>登録情報の取得に失敗しました。<a href="./creators-login.html">ログイン</a> または <a href="./creators-register.html">新規登録</a> からお試しください。</p>';
+            });
         }
 
         if (creatorId) {
@@ -251,7 +423,11 @@
                 pleaseRegister.style.display = "block";
                 return;
               }
-              var supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+              var storage =
+                typeof window.buildyGetAuthStorage === "function" ? window.buildyGetAuthStorage() : localStorage;
+              var supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+                auth: { storage: storage, persistSession: true, autoRefreshToken: true },
+              });
               return supabase.auth.getSession().then(function (res) {
                 var session = res.data && res.data.session;
                 if (!session || !session.access_token) {
@@ -262,7 +438,8 @@
                   .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
                   .then(function (data) {
                     if (data.creator && data.creator.id) {
-                      try { localStorage.setItem("buildy_creator_id", data.creator.id); } catch (_) {}
+                      if (typeof window.buildySetCreatorId === "function") window.buildySetCreatorId(data.creator.id);
+                      else try { localStorage.setItem("buildy_creator_id", data.creator.id); } catch (_) {}
                       loadDashboard(data.creator.id);
                     } else {
                       pleaseRegister.style.display = "block";
@@ -270,13 +447,9 @@
                   });
               });
             })
-            .catch(function () { pleaseRegister.style.display = "block"; });
-        }
-
-        function escapeHtml(s) {
-          const div = document.createElement("div");
-          div.textContent = s == null ? "" : s;
-          return div.innerHTML;
+            .catch(function () {
+              pleaseRegister.style.display = "block";
+            });
         }
       })();
     </script>

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Creator login | Buildy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <a href="./index.html" class="page-logo">Buildy</a>
+        <nav class="page-nav">
+          <a href="./index.html">Home</a>
+          <a href="./creators-register-en.html">Sign up</a>
+          <a href="./creator-dashboard-en.html">Dashboard</a>
+          <a href="./creators-login.html" class="page-lang">日本語</a>
+        </nav>
+      </header>
+      <section class="page-main">
+        <h1>Creator login</h1>
+        <p class="page-lead">
+          Sign in if you already have an account. New here?
+          <a href="./creators-register-en.html">Create a creator account</a>.
+        </p>
+        <p id="login-loading" class="page-lead" style="margin-bottom: 1rem; color: var(--text-sub);">Checking configuration…</p>
+
+        <div id="login-with-auth" style="display: none;">
+          <label class="page-checkbox" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem; cursor: pointer; max-width: 28rem;">
+            <input type="checkbox" id="remember-me" checked />
+            <span>Keep me signed in (stay logged in after closing the browser)</span>
+          </label>
+
+          <p style="margin-bottom: 1rem;">
+            <button type="button" id="google-login-btn" class="btn primary-btn" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+              <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+              Continue with Google
+            </button>
+          </p>
+          <p style="margin: 0.75rem 0; color: var(--text-sub); font-size: 0.9rem;">— or sign in with email —</p>
+          <form id="login-form-email" class="page-form" style="max-width: 28rem;">
+            <label for="login-email">Email</label>
+            <input id="login-email" name="email" type="email" required autocomplete="email" placeholder="you@example.com" />
+            <label for="login-password">Password</label>
+            <input id="login-password" name="password" type="password" required autocomplete="current-password" placeholder="********" />
+            <button type="submit" class="btn primary-btn">Sign in</button>
+          </form>
+        </div>
+
+        <div id="login-no-auth" style="display: none;">
+          <p class="page-lead">
+            Set Supabase URL and anon key in the environment to enable email/password or Google sign-in.
+          </p>
+          <p><a href="./creators-register-en.html" class="btn primary-btn">Creator signup (email only)</a></p>
+        </div>
+
+        <p id="login-result" style="margin-top: 1rem; min-height: 1.5em;"></p>
+      </section>
+    </main>
+    <script src="./auth-storage.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script>
+      (function () {
+        var resultEl = document.getElementById("login-result");
+        var withAuth = document.getElementById("login-with-auth");
+        var noAuth = document.getElementById("login-no-auth");
+        var loadingEl = document.getElementById("login-loading");
+        var rememberEl = document.getElementById("remember-me");
+
+        function hideLoading() {
+          if (loadingEl) loadingEl.style.display = "none";
+        }
+
+        function authCallbackUrl() {
+          return window.location.origin + (window.location.pathname.replace(/[^/]+$/, "") || "/") + "auth-callback-en.html";
+        }
+
+        function applyRemember() {
+          if (typeof window.buildySetRememberSession === "function") {
+            window.buildySetRememberSession(rememberEl ? rememberEl.checked : true);
+          }
+        }
+
+        function syncCreatorAndRedirect(accessToken) {
+          return fetch("/api/creators/me", {
+            headers: { Authorization: "Bearer " + accessToken },
+          })
+            .then(function (r) {
+              if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || "Sync failed"); });
+              return r.json();
+            })
+            .then(function (data) {
+              var c = data.creator;
+              if (c && c.id) {
+                if (typeof window.buildySetCreatorId === "function") window.buildySetCreatorId(c.id);
+                else try { localStorage.setItem("buildy_creator_id", c.id); } catch (_) {}
+                var base = window.location.pathname.replace(/[^/]*$/, "") || "/";
+                if (!base.endsWith("/")) base = base + "/";
+                window.location.replace(window.location.origin + base + "creator-dashboard-en.html");
+              } else {
+                throw new Error("Could not load creator profile. Please sign up first.");
+              }
+            });
+        }
+
+        fetch("/api/config")
+          .then(function (r) { return r.json(); })
+          .then(function (config) {
+            hideLoading();
+            if (config.supabaseUrl && config.supabaseAnonKey) {
+              withAuth.style.display = "block";
+              noAuth.style.display = "none";
+
+              function makeClient() {
+                applyRemember();
+                var storage = typeof window.buildyGetAuthStorage === "function" ? window.buildyGetAuthStorage() : localStorage;
+                return window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+                  auth: { storage: storage, persistSession: true, autoRefreshToken: true },
+                });
+              }
+
+              var googleBtn = document.getElementById("google-login-btn");
+              if (googleBtn) {
+                googleBtn.addEventListener("click", function () {
+                  resultEl.textContent = "Redirecting to Google…";
+                  resultEl.style.color = "";
+                  applyRemember();
+                  var storage = typeof window.buildyGetAuthStorage === "function" ? window.buildyGetAuthStorage() : localStorage;
+                  var supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+                    auth: { storage: storage, persistSession: true, autoRefreshToken: true },
+                  });
+                  supabaseClient.auth.signInWithOAuth({
+                    provider: "google",
+                    options: { redirectTo: authCallbackUrl() },
+                  }).then(function (res) {
+                    if (res.error) {
+                      resultEl.textContent = "Error: " + (res.error.message || "Google sign-in failed");
+                      resultEl.style.color = "#c00";
+                    }
+                  }).catch(function (err) {
+                    resultEl.textContent = "Error: " + (err.message || "Google sign-in failed");
+                    resultEl.style.color = "#c00";
+                  });
+                });
+              }
+
+              var formEmail = document.getElementById("login-form-email");
+              if (formEmail) {
+                formEmail.addEventListener("submit", function (e) {
+                  e.preventDefault();
+                  var email = document.getElementById("login-email").value.trim();
+                  var password = document.getElementById("login-password").value;
+                  if (!email || !password) {
+                    resultEl.textContent = "Enter email and password.";
+                    resultEl.style.color = "#c00";
+                    return;
+                  }
+                  resultEl.textContent = "Signing in…";
+                  resultEl.style.color = "";
+                  var btn = formEmail.querySelector('button[type="submit"]');
+                  if (btn) btn.disabled = true;
+                  var supabaseClient = makeClient();
+                  supabaseClient.auth.signInWithPassword({ email: email, password: password })
+                    .then(function (res) {
+                      if (res.error) throw res.error;
+                      var session = res.data && res.data.session;
+                      if (!session || !session.access_token) throw new Error("No session");
+                      return syncCreatorAndRedirect(session.access_token);
+                    })
+                    .catch(function (err) {
+                      resultEl.textContent = "Error: " + (err.message || "Sign-in failed");
+                      resultEl.style.color = "#c00";
+                      if (btn) btn.disabled = false;
+                    });
+                });
+              }
+            } else {
+              withAuth.style.display = "none";
+              noAuth.style.display = "block";
+              if (resultEl && config.envHint) {
+                resultEl.textContent = config.envHint;
+                resultEl.style.color = "var(--text-sub)";
+              }
+            }
+          })
+          .catch(function () {
+            hideLoading();
+            withAuth.style.display = "none";
+            noAuth.style.display = "block";
+          });
+      })();
+    </script>
+  </body>
+</html>

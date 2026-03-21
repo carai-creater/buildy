@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Signing in… | Buildy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <p style="text-align: right; padding: 0.5rem 1rem 0;"><a href="./auth-callback.html" class="page-lang" style="font-size: 0.9rem;">日本語</a></p>
+      <section class="page-main">
+        <p id="auth-status">Verifying sign-in…</p>
+        <p id="auth-error" style="display: none; color: #c00;"></p>
+      </section>
+    </main>
+    <script src="./auth-storage.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script>
+      (function () {
+        var statusEl = document.getElementById("auth-status");
+        var errorEl = document.getElementById("auth-error");
+        function showError(msg) {
+          statusEl.style.display = "none";
+          errorEl.style.display = "block";
+          errorEl.textContent = msg;
+        }
+        function parseFragment() {
+          var hash = window.location.hash.slice(1);
+          var params = {};
+          hash.split("&").forEach(function (p) {
+            var kv = p.split("=");
+            if (kv.length >= 2) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv.slice(1).join("="));
+          });
+          return params;
+        }
+        function parseQuery() {
+          var q = window.location.search.slice(1);
+          var params = {};
+          q.split("&").forEach(function (p) {
+            var kv = p.split("=");
+            if (kv.length >= 2) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv.slice(1).join("="));
+          });
+          return params;
+        }
+        fetch("/api/config")
+          .then(function (r) { return r.json(); })
+          .then(function (config) {
+            if (!config.supabaseUrl || !config.supabaseAnonKey) {
+              showError("Email sign-in is not configured.");
+              return;
+            }
+            var hashParams = parseFragment();
+            var queryParams = parseQuery();
+            var authStorage =
+              typeof window.buildyGetAuthStorage === "function" ? window.buildyGetAuthStorage() : localStorage;
+            var supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+              auth: {
+                storage: authStorage,
+                persistSession: true,
+                autoRefreshToken: true,
+              },
+            });
+            var accessToken = hashParams.access_token || queryParams.access_token;
+            var refreshToken = hashParams.refresh_token || queryParams.refresh_token;
+            var tokenHash = hashParams.token_hash || queryParams.token_hash;
+            var type = (hashParams.type || queryParams.type || "signup").toLowerCase();
+            var nextDest = (queryParams.next || hashParams.next || "").toLowerCase();
+            var showWelcomeBanner = queryParams.welcome === "1" || hashParams.welcome === "1";
+
+            function onSession(session) {
+              if (!session || !session.access_token) {
+                showError("Could not obtain a session.");
+                return;
+              }
+              var isUser = nextDest === "user";
+              var apiUrl = isUser ? "/api/users/me" : "/api/creators/me";
+              var dataKey = isUser ? "user" : "creator";
+              var redirectTo = isUser
+                ? "./mypage-en.html"
+                : "./creator-dashboard-en.html" + (showWelcomeBanner ? "?registered=1" : "");
+              fetch(apiUrl, {
+                headers: { Authorization: "Bearer " + session.access_token },
+              })
+                .then(function (r) {
+                  if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || "Sync failed"); });
+                  return r.json();
+                })
+                .then(function (data) {
+                  var entity = data[dataKey];
+                  if (entity && entity.id) {
+                    if (isUser) {
+                      if (typeof window.buildySetUserId === "function") window.buildySetUserId(entity.id);
+                      else try { localStorage.setItem("buildy_user_id", entity.id); } catch (_) {}
+                    } else {
+                      if (typeof window.buildySetCreatorId === "function") window.buildySetCreatorId(entity.id);
+                      else try { localStorage.setItem("buildy_creator_id", entity.id); } catch (_) {}
+                    }
+                  }
+                  window.location.replace(redirectTo);
+                })
+                .catch(function (err) {
+                  showError(err.message || "Failed to sync your account.");
+                });
+            }
+
+            if (accessToken && refreshToken) {
+              supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+                .then(function (_ref) { return _ref.data.session; })
+                .then(onSession)
+                .catch(function (err) {
+                  showError(err.message || "Failed to set session.");
+                });
+              return;
+            }
+            if (tokenHash) {
+              supabase.auth.verifyOtp({ token_hash: tokenHash, type: type })
+                .then(function (res) { return res.data.session; })
+                .then(onSession)
+                .catch(function (err) {
+                  showError(err.message || "Email confirmation failed.");
+                });
+              return;
+            }
+            var code = queryParams.code || hashParams.code;
+            if (code) {
+              supabase.auth.exchangeCodeForSession(code)
+                .then(function (res) { return res.data.session; })
+                .then(onSession)
+                .catch(function (err) {
+                  showError(err.message || "Could not complete sign-in.");
+                });
+              return;
+            }
+            showError("No auth data found. Please try again from the email link or sign-in page.");
+          })
+          .catch(function () {
+            showError("Could not load configuration.");
+          });
+      })();
+    </script>
+  </body>
+</html>

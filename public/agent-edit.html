@@ -15,6 +15,7 @@
           <a href="./agents.html">エージェント一覧</a>
           <a href="./creator-dashboard.html">ダッシュボード</a>
           <a href="./agent-add.html">エージェントを追加</a>
+          <a href="./agent-edit-en.html" class="page-lang" id="agent-edit-lang-en">English</a>
         </nav>
       </header>
       <section class="page-main">
@@ -90,6 +91,11 @@
               resultEl.textContent = "通信エラーです。";
             });
         });
+      })();
+      (function () {
+        var id = new URLSearchParams(location.search).get("id");
+        var a = document.getElementById("agent-edit-lang-en");
+        if (a && id) a.href = "./agent-edit-en.html?id=" + encodeURIComponent(id);
       })();
     </script>
   </body>

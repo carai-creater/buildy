@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Creator dashboard | Buildy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page page--creator-studio">
+      <header class="page-header">
+        <a href="./index.html" class="page-logo">Buildy</a>
+        <nav class="page-nav">
+          <a href="./index.html">Home</a>
+          <a href="./agents-en.html">Public catalog</a>
+          <a href="./agent-add-en.html">Add agent</a>
+          <a href="./creator-dashboard.html" class="page-lang">日本語</a>
+        </nav>
+      </header>
+      <section class="page-main">
+        <div id="dashboard-please-register" class="page-empty" style="display: none; padding: 3rem 1.5rem;">
+          <h1>Creator dashboard</h1>
+          <p>Sign in, or create an account if you’re new.</p>
+          <p style="display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; margin-top: 1rem;">
+            <a href="./creators-login-en.html" class="btn primary-btn">Sign in</a>
+            <a href="./creators-register-en.html" class="btn ghost-btn">Sign up</a>
+          </p>
+        </div>
+
+        <div id="dashboard-content" style="display: none;" class="cd-shell">
+          <aside class="cd-sidebar" aria-label="Dashboard menu">
+            <div class="cd-sidebar-brand">Buildy</div>
+            <div class="cd-sidebar-section">
+              <div class="cd-sidebar-label">Menu</div>
+              <button type="button" class="cd-sidebar-link active" data-tab="tab-agents">Agents</button>
+              <button type="button" class="cd-sidebar-link" data-tab="tab-analytics">Earnings</button>
+              <button type="button" class="cd-sidebar-link" data-tab="tab-profile">Profile</button>
+              <button type="button" class="cd-sidebar-link" data-tab="tab-other">Other</button>
+            </div>
+            <div class="cd-sidebar-footer">
+              <a href="./index.html">← Back to home</a>
+            </div>
+          </aside>
+
+          <div class="cd-workspace">
+            <header class="cd-workspace-head">
+              <h1>My page</h1>
+              <p id="dashboard-welcome" class="page-lead"></p>
+            </header>
+
+            <div id="tab-agents" class="cd-tab-panel is-active">
+              <div id="dashboard-after-register" class="cd-banner" style="display: none;">
+                <p>You’re set. Use “Add agent” to publish your first agent to the list.</p>
+              </div>
+              <div class="cd-toolbar">
+                <span class="cd-toolbar-title">Your uploaded agents</span>
+                <a href="./agent-add-en.html" class="btn primary-btn">+ Add agent</a>
+              </div>
+              <div class="cd-panel">
+                <div class="cd-split">
+                  <div class="cd-agent-list-wrap">
+                    <div id="cd-agent-list" class="cd-agent-list" role="listbox" aria-label="Agent list"></div>
+                  </div>
+                  <div class="cd-agent-detail-wrap">
+                    <div id="cd-agent-detail" class="cd-agent-detail"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="tab-analytics" class="cd-tab-panel">
+              <div class="dashboard-section" style="margin: 0; border-radius: 8px;">
+                <h2 style="margin-top: 0;">Earnings &amp; analytics</h2>
+                <div class="dashboard-analytics-summary">
+                  <div class="dashboard-analytics-item">
+                    <p class="dashboard-analytics-label">Total runs</p>
+                    <p id="dashboard-total-runs" class="dashboard-analytics-value">0</p>
+                  </div>
+                  <div class="dashboard-analytics-item">
+                    <p class="dashboard-analytics-label">Total revenue (excl. tax)</p>
+                    <p id="dashboard-total-earnings" class="dashboard-analytics-value">¥0</p>
+                  </div>
+                </div>
+                <h3 class="dashboard-analytics-subtitle">By agent</h3>
+                <div id="dashboard-earnings-by-agent" class="dashboard-analytics-table-wrap">
+                  <p class="page-empty" style="margin: 0;">Loading…</p>
+                </div>
+                <p style="margin: 1rem 0 0; font-size: 13px; color: var(--text-sub);">
+                  * Run counts and estimated revenue. Actual payouts apply after payment integration.
+                </p>
+              </div>
+            </div>
+
+            <div id="tab-profile" class="cd-tab-panel">
+              <div class="dashboard-section" style="margin: 0; border-radius: 8px; max-width: 480px;">
+                <h2 style="margin-top: 0;">Profile</h2>
+                <form id="profile-form" class="dashboard-profile-form">
+                  <label for="profile-name">Display name</label>
+                  <input id="profile-name" name="name" type="text" required placeholder="Your name" autocomplete="name" />
+                  <label for="profile-email">Email</label>
+                  <input id="profile-email" name="email" type="email" required placeholder="you@example.com" autocomplete="email" />
+                  <button type="submit" class="save-btn">Save</button>
+                </form>
+                <p id="profile-result" class="dashboard-profile-result"></p>
+              </div>
+            </div>
+
+            <div id="tab-other" class="cd-tab-panel">
+              <div class="dashboard-section" style="margin: 0; border-radius: 8px;">
+                <h2 style="margin-top: 0;">Other</h2>
+                <ul style="margin: 0; padding-left: 1.25rem; font-size: 14px;">
+                  <li><a href="./agent-add-en.html">Add an agent</a></li>
+                  <li><a href="./agents-en.html">Public agent catalog</a></li>
+                  <li><a href="./index.html">Home</a></li>
+                </ul>
+                <p style="margin-top: 1.25rem;">
+                  <button type="button" id="dashboard-logout" class="btn">Sign out (clear saved login)</button>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script src="./auth-storage.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script>
+      (function () {
+        var creatorId =
+          typeof window.buildyGetStoredCreatorId === "function"
+            ? window.buildyGetStoredCreatorId()
+            : (function () {
+                try {
+                  return localStorage.getItem("buildy_creator_id") || sessionStorage.getItem("buildy_creator_id") || "";
+                } catch (_) {
+                  return "";
+                }
+              })();
+
+        var pleaseRegister = document.getElementById("dashboard-please-register");
+        var content = document.getElementById("dashboard-content");
+        var welcomeEl = document.getElementById("dashboard-welcome");
+        var listEl = document.getElementById("cd-agent-list");
+        var detailEl = document.getElementById("cd-agent-detail");
+
+        var dashboardAgents = [];
+        var earningsByAgentId = {};
+
+        function escapeHtml(s) {
+          var div = document.createElement("div");
+          div.textContent = s == null ? "" : s;
+          return div.innerHTML;
+        }
+
+        function switchTab(tabId) {
+          document.querySelectorAll(".cd-tab-panel").forEach(function (p) {
+            p.classList.toggle("is-active", p.id === tabId);
+          });
+          document.querySelectorAll(".cd-sidebar-link").forEach(function (btn) {
+            btn.classList.toggle("active", btn.getAttribute("data-tab") === tabId);
+          });
+        }
+
+        document.querySelectorAll(".cd-sidebar-link").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var tab = btn.getAttribute("data-tab");
+            if (tab) switchTab(tab);
+          });
+        });
+
+        function renderDetail(agent) {
+          if (!agent) {
+            detailEl.innerHTML =
+              '<div class="cd-agent-detail-empty">Select an agent from the list or <a href="./agent-add-en.html">add one</a>.</div>';
+            return;
+          }
+          var stat = earningsByAgentId[agent.id] || {};
+          var runsText = stat.runs != null && stat.runs !== "" ? String(Number(stat.runs)) + " runs" : "—";
+          var earn = stat.earnings != null ? "¥" + Number(stat.earnings).toLocaleString() : "—";
+          var price = "¥" + Number(agent.pricePerRun || 0).toLocaleString() + " / run";
+          detailEl.innerHTML =
+            '<div class="cd-detail-badge">' +
+            escapeHtml(agent.category || "Uncategorized") +
+            "</div>" +
+            '<h2 class="cd-detail-title">' +
+            escapeHtml(agent.name) +
+            "</h2>" +
+            '<div class="cd-detail-block"><p class="cd-detail-label">Description</p><p class="cd-detail-value">' +
+            escapeHtml(agent.shortDescription || "—") +
+            "</p></div>" +
+            '<div class="cd-detail-block"><p class="cd-detail-label">Price</p><p class="cd-detail-value">' +
+            escapeHtml(price) +
+            "</p></div>" +
+            '<div class="cd-detail-block"><p class="cd-detail-label">Runs (recorded)</p><p class="cd-detail-value">' +
+            runsText +
+            "</p></div>" +
+            '<div class="cd-detail-block"><p class="cd-detail-label">Est. revenue (excl. tax)</p><p class="cd-detail-value">' +
+            earn +
+            "</p></div>" +
+            '<div class="cd-detail-block"><p class="cd-detail-label">Agent ID</p><pre class="cd-detail-snippet">' +
+            escapeHtml(agent.id) +
+            "</pre></div>" +
+            '<div class="cd-detail-actions">' +
+            '<a href="./agent-edit-en.html?id=' +
+            encodeURIComponent(agent.id) +
+            '" class="btn primary-btn">Edit</a>' +
+            '<button type="button" class="btn agent-delete-btn" data-id="' +
+            escapeHtml(agent.id) +
+            '">Delete</button>' +
+            "</div>";
+          var del = detailEl.querySelector(".agent-delete-btn");
+          if (del) {
+            del.addEventListener("click", function () {
+              var id = del.getAttribute("data-id");
+              if (!id || !confirm("Delete this agent?")) return;
+              fetch("/api/agents/" + encodeURIComponent(id), { method: "DELETE" }).then(function (r) {
+                if (r.status === 204) location.reload();
+                else r.json().then(function (d) { alert(d.error || "Delete failed"); });
+              });
+            });
+          }
+        }
+
+        function selectAgent(id) {
+          document.querySelectorAll(".cd-agent-row").forEach(function (row) {
+            row.classList.toggle("is-selected", row.getAttribute("data-agent-id") === id);
+          });
+          var agent = dashboardAgents.find(function (a) { return a.id === id; });
+          renderDetail(agent || null);
+        }
+
+        function renderAgentList(agents) {
+          if (!agents.length) {
+            listEl.innerHTML =
+              '<p class="page-empty" style="text-align: center; padding: 1.5rem 0.75rem; font-size: 14px;">No agents yet.<br /><a href="./agent-add-en.html">Add your first</a></p>';
+            renderDetail(null);
+            return;
+          }
+          listEl.innerHTML = agents
+            .map(function (a) {
+              return (
+                '<button type="button" class="cd-agent-row" role="option" data-agent-id="' +
+                escapeHtml(a.id) +
+                '">' +
+                '<p class="cd-agent-row-name">' +
+                escapeHtml(a.name) +
+                "</p>" +
+                '<p class="cd-agent-row-meta">' +
+                escapeHtml(a.category || "Uncategorized") +
+                " · ¥" +
+                Number(a.pricePerRun || 0).toLocaleString() +
+                "/run</p>" +
+                "</button>"
+              );
+            })
+            .join("");
+          listEl.querySelectorAll(".cd-agent-row").forEach(function (row) {
+            row.addEventListener("click", function () {
+              selectAgent(row.getAttribute("data-agent-id"));
+            });
+          });
+          selectAgent(agents[0].id);
+        }
+
+        function loadDashboard(id) {
+          creatorId = id;
+          fetch("/api/creators/" + encodeURIComponent(creatorId))
+            .then(function (r) {
+              return r.ok ? r.json() : Promise.reject(r);
+            })
+            .then(function (data) {
+              content.style.display = "flex";
+              welcomeEl.textContent = "Welcome, " + (data.creator ? data.creator.name : "") + ".";
+              var afterRegister = document.getElementById("dashboard-after-register");
+              if (afterRegister && (window.location.search || "").indexOf("registered=1") !== -1) {
+                afterRegister.style.display = "block";
+              }
+              var earnings = data.earnings || {};
+              var totalRuns = earnings.totalRuns != null ? earnings.totalRuns : 0;
+              var totalEarnings = earnings.totalEarnings != null ? earnings.totalEarnings : 0;
+              var runsEl = document.getElementById("dashboard-total-runs");
+              var earnEl = document.getElementById("dashboard-total-earnings");
+              if (runsEl) runsEl.textContent = String(totalRuns);
+              if (earnEl) earnEl.textContent = "¥" + Number(totalEarnings).toLocaleString();
+
+              earningsByAgentId = {};
+              (earnings.byAgent || []).forEach(function (row) {
+                if (row.agentId) earningsByAgentId[row.agentId] = row;
+              });
+
+              var byAgentEl = document.getElementById("dashboard-earnings-by-agent");
+              if (byAgentEl) {
+                var byAgent = earnings.byAgent || [];
+                if (byAgent.length === 0) {
+                  byAgentEl.innerHTML =
+                    '<p class="page-empty" style="margin: 0;">No agents or no run history yet.</p>';
+                } else {
+                  byAgentEl.innerHTML =
+                    '<table class="dashboard-analytics-table"><thead><tr><th>Agent</th><th>Runs</th><th>Price</th><th>Revenue</th></tr></thead><tbody>' +
+                    byAgent
+                      .map(function (a) {
+                        return (
+                          "<tr><td>" +
+                          escapeHtml(a.agentName || a.agentId) +
+                          "</td><td>" +
+                          (a.runs || 0) +
+                          "</td><td>¥" +
+                          Number(a.pricePerRun || 0).toLocaleString() +
+                          "</td><td>¥" +
+                          Number(a.earnings || 0).toLocaleString() +
+                          "</td></tr>"
+                        );
+                      })
+                      .join("") +
+                    "</tbody></table>";
+                }
+              }
+
+              var profileName = document.getElementById("profile-name");
+              var profileEmail = document.getElementById("profile-email");
+              if (profileName && data.creator) profileName.value = data.creator.name || "";
+              if (profileEmail && data.creator) profileEmail.value = data.creator.email || "";
+
+              dashboardAgents = data.agents || [];
+              renderAgentList(dashboardAgents);
+
+              var profileForm = document.getElementById("profile-form");
+              var profileResult = document.getElementById("profile-result");
+              if (profileForm && profileResult) {
+                profileForm.addEventListener("submit", function (e) {
+                  e.preventDefault();
+                  var nameEl = document.getElementById("profile-name");
+                  var emailEl = document.getElementById("profile-email");
+                  var name = nameEl && nameEl.value ? nameEl.value.trim() : "";
+                  var email = emailEl && emailEl.value ? emailEl.value.trim() : "";
+                  if (!name || !email) {
+                    profileResult.textContent = "Enter display name and email.";
+                    profileResult.className = "dashboard-profile-result error";
+                    return;
+                  }
+                  var saveBtn = profileForm.querySelector('button[type="submit"]');
+                  if (saveBtn) saveBtn.disabled = true;
+                  profileResult.textContent = "Saving…";
+                  profileResult.className = "dashboard-profile-result";
+                  fetch("/api/creators/" + encodeURIComponent(creatorId), {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: name, email: email }),
+                  })
+                    .then(function (r) {
+                      if (!r.ok) {
+                        return r
+                          .json()
+                          .then(function (d) {
+                            throw new Error((d && d.error) ? d.error : "Save failed");
+                          })
+                          .catch(function (jsonErr) {
+                            if (jsonErr.message && jsonErr.message !== "Unexpected end of JSON input") throw jsonErr;
+                            throw new Error("Save failed (" + r.status + ")");
+                          });
+                      }
+                      return r.json();
+                    })
+                    .then(function () {
+                      profileResult.textContent = "Saved.";
+                      profileResult.className = "dashboard-profile-result success";
+                      if (welcomeEl) welcomeEl.textContent = "Welcome, " + name + ".";
+                      if (saveBtn) saveBtn.disabled = false;
+                    })
+                    .catch(function (err) {
+                      profileResult.textContent = "Error: " + (err.message || "Save failed");
+                      profileResult.className = "dashboard-profile-result error";
+                      if (saveBtn) saveBtn.disabled = false;
+                    });
+                });
+              }
+
+              var logoutBtn = document.getElementById("dashboard-logout");
+              if (logoutBtn) {
+                logoutBtn.addEventListener("click", function () {
+                  fetch("/api/config")
+                    .then(function (r) { return r.json(); })
+                    .then(function (config) {
+                      if (config.supabaseUrl && config.supabaseAnonKey) {
+                        var storage =
+                          typeof window.buildyGetAuthStorage === "function"
+                            ? window.buildyGetAuthStorage()
+                            : localStorage;
+                        var sb = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+                          auth: { storage: storage, persistSession: true, autoRefreshToken: true },
+                        });
+                        return sb.auth.signOut();
+                      }
+                    })
+                    .catch(function () {})
+                    .finally(function () {
+                      if (typeof window.buildyClearCreatorSession === "function") window.buildyClearCreatorSession();
+                      else {
+                        try {
+                          localStorage.removeItem("buildy_creator_id");
+                          sessionStorage.removeItem("buildy_creator_id");
+                        } catch (_) {}
+                      }
+                      location.reload();
+                    });
+                });
+              }
+            })
+            .catch(function () {
+              pleaseRegister.style.display = "block";
+              pleaseRegister.innerHTML =
+                '<h1>Creator dashboard</h1><p>Could not load your account. Try <a href="./creators-login-en.html">sign in</a> or <a href="./creators-register-en.html">sign up</a>.</p>';
+            });
+        }
+
+        if (creatorId) {
+          loadDashboard(creatorId);
+        } else {
+          fetch("/api/config")
+            .then(function (r) { return r.json(); })
+            .then(function (config) {
+              if (!config.supabaseUrl || !config.supabaseAnonKey) {
+                pleaseRegister.style.display = "block";
+                return;
+              }
+              var storage =
+                typeof window.buildyGetAuthStorage === "function" ? window.buildyGetAuthStorage() : localStorage;
+              var supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+                auth: { storage: storage, persistSession: true, autoRefreshToken: true },
+              });
+              return supabase.auth.getSession().then(function (res) {
+                var session = res.data && res.data.session;
+                if (!session || !session.access_token) {
+                  pleaseRegister.style.display = "block";
+                  return;
+                }
+                return fetch("/api/creators/me", { headers: { Authorization: "Bearer " + session.access_token } })
+                  .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+                  .then(function (data) {
+                    if (data.creator && data.creator.id) {
+                      if (typeof window.buildySetCreatorId === "function") window.buildySetCreatorId(data.creator.id);
+                      else try { localStorage.setItem("buildy_creator_id", data.creator.id); } catch (_) {}
+                      loadDashboard(data.creator.id);
+                    } else {
+                      pleaseRegister.style.display = "block";
+                    }
+                  });
+              });
+            })
+            .catch(function () {
+              pleaseRegister.style.display = "block";
+            });
+        }
+      })();
+    </script>
+  </body>
+</html>

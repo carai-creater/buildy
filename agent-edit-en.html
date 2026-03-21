@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Edit agent | Buildy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <a href="./index.html" class="page-logo">Buildy</a>
+        <nav class="page-nav">
+          <a href="./index.html">Home</a>
+          <a href="./agents-en.html">Agents</a>
+          <a href="./creator-dashboard-en.html">Dashboard</a>
+          <a href="./agent-add-en.html">Add agent</a>
+          <a href="./agent-edit.html" class="page-lang" id="agent-edit-lang-ja">日本語</a>
+        </nav>
+      </header>
+      <section class="page-main">
+        <h1>Edit agent</h1>
+        <p id="edit-loading" class="page-lead">Loading…</p>
+        <form id="agent-form" class="page-form" style="max-width: 32rem; display: none;">
+          <label for="name">Agent name *</label>
+          <input id="name" name="name" type="text" required />
+          <label for="category">Category</label>
+          <input id="category" name="category" type="text" />
+          <label for="shortDescription">Short description</label>
+          <textarea id="shortDescription" name="shortDescription" rows="2"></textarea>
+          <label for="pricePerRun">Price per run (JPY)</label>
+          <input id="pricePerRun" name="pricePerRun" type="number" min="0" />
+          <label for="system_prompt">System prompt (for the LLM)</label>
+          <textarea id="system_prompt" name="system_prompt" rows="4"></textarea>
+          <button type="submit" class="btn primary-btn">Save</button>
+        </form>
+        <p id="agent-result" style="margin-top: 1rem;"></p>
+      </section>
+    </main>
+    <script>
+      (function () {
+        const params = new URLSearchParams(location.search);
+        const id = params.get("id");
+        if (!id) {
+          document.getElementById("edit-loading").textContent = "No agent ID in the URL.";
+          return;
+        }
+        const form = document.getElementById("agent-form");
+        const loadingEl = document.getElementById("edit-loading");
+        const resultEl = document.getElementById("agent-result");
+        fetch("/api/agents/" + encodeURIComponent(id))
+          .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+          .then((data) => {
+            const a = data.agent;
+            if (!a) return Promise.reject(new Error("Not found"));
+            loadingEl.style.display = "none";
+            form.style.display = "block";
+            document.getElementById("name").value = a.name || "";
+            document.getElementById("category").value = a.category || "";
+            document.getElementById("shortDescription").value = a.shortDescription || "";
+            document.getElementById("pricePerRun").value = a.pricePerRun ?? 0;
+            document.getElementById("system_prompt").value = a.system_prompt || "";
+          })
+          .catch(() => {
+            loadingEl.textContent = "Could not load this agent.";
+          });
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+          const payload = {
+            name: document.getElementById("name").value.trim(),
+            category: document.getElementById("category").value.trim() || undefined,
+            shortDescription: document.getElementById("shortDescription").value.trim() || undefined,
+            pricePerRun: parseInt(document.getElementById("pricePerRun").value, 10) || 0,
+            system_prompt: document.getElementById("system_prompt").value.trim() || undefined,
+          };
+          resultEl.textContent = "Saving…";
+          fetch("/api/agents/" + encodeURIComponent(id), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+            .then((r) => r.json())
+            .then((data) => {
+              if (data.agent) {
+                resultEl.innerHTML = "Saved. → <a href=\"./creator-dashboard-en.html\">Dashboard</a>";
+              } else {
+                resultEl.textContent = "Error: " + (data.error || "Save failed");
+              }
+            })
+            .catch(() => {
+              resultEl.textContent = "Network error.";
+            });
+        });
+      })();
+      (function () {
+        var id = new URLSearchParams(location.search).get("id");
+        var a = document.getElementById("agent-edit-lang-ja");
+        if (a && id) a.href = "./agent-edit.html?id=" + encodeURIComponent(id);
+      })();
+    </script>
+  </body>
+</html>
