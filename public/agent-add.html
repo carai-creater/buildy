@@ -220,7 +220,11 @@
                 data.agent.name +
                 " → <a href=\"./creator-dashboard.html\">ダッシュボードへ</a> / <a href=\"./agents.html\">一覧へ</a>";
             } else {
-              resultEl.textContent = "エラー: " + (data.error || "追加に失敗しました");
+              resultEl.style.whiteSpace = "pre-wrap";
+              var hintJa = data.message || data.messageEn || "";
+              resultEl.textContent = hintJa
+                ? (data.error || "エラー") + "\n\n" + hintJa
+                : "エラー: " + (data.error || "追加に失敗しました");
               resultEl.style.color = "#c00";
             }
           })

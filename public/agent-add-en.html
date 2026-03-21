@@ -220,7 +220,11 @@
                 data.agent.name +
                 " → <a href=\"./creator-dashboard-en.html\">Dashboard</a> / <a href=\"./agents-en.html\">List</a>";
             } else {
-              resultEl.textContent = "Error: " + (data.error || "Could not add agent");
+              resultEl.style.whiteSpace = "pre-wrap";
+              var hintEn = data.messageEn || data.message || "";
+              resultEl.textContent = hintEn
+                ? (data.error || "Error") + "\n\n" + hintEn
+                : "Error: " + (data.error || "Could not add agent");
               resultEl.style.color = "#c00";
             }
           })

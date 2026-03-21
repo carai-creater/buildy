@@ -1179,6 +1179,8 @@ app.post("/api/agents", async (req, res) => {
       error: "database_schema",
       message:
         "Supabase で docs/supabase-agents-github-repo.sql と docs/supabase-agents-public-ui.sql を実行し、github_repo / public_ui_url カラムを追加してください。",
+      messageEn:
+        "In Supabase → SQL Editor, run docs/supabase-agents-github-repo.sql and docs/supabase-agents-public-ui.sql from the Buildy repo to add the github_repo and public_ui_url columns.",
     });
   }
   if (result.error) return res.status(400).json({ error: result.error.message });
