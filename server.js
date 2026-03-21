@@ -98,7 +98,12 @@ app.use(express.static(apiStatic));
 
 app.get("/api/agents", async (_req, res) => {
   if (!supabase) return res.json({ agents: [] });
-  const { data, error } = await supabase.from("agents").select("id, name, category, short_description, price_per_run, hero").order("created_at", { ascending: false });
+  // マーケットプレイス一覧はクリエイターが紐づけたエージェントのみ（creator_id あり）
+  const { data, error } = await supabase
+    .from("agents")
+    .select("id, name, category, short_description, price_per_run, hero")
+    .not("creator_id", "is", null)
+    .order("created_at", { ascending: false });
   if (error) return res.status(500).json({ error: error.message, agents: [] });
   const agents = (data || []).map((r) => ({
     id: r.id,
@@ -129,10 +134,11 @@ app.get("/api/agents/:id", async (req, res) => {
 });
 
 app.post("/api/agents/:id/run", async (req, res) => {
-  const agent = supabase
-    ? (await supabase.from("agents").select("id, name").eq("id", req.params.id).single()).data
+  const row = supabase
+    ? (await supabase.from("agents").select("id, name, creator_id").eq("id", req.params.id).single()).data
     : null;
-  if (!agent) return res.status(404).json({ error: "Agent not found" });
+  if (!row || !row.creator_id) return res.status(404).json({ error: "Agent not found" });
+  const agent = { id: row.id, name: row.name };
 
   const { query, user_id: userId } = req.body || {};
   const safeQuery = typeof query === "string" && query.trim() ? query.trim() : "指定なし";
@@ -411,6 +417,22 @@ app.post("/api/agents", async (req, res) => {
   if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
   const { name, category, shortDescription, pricePerRun, system_prompt, creator_id, github_repo } = req.body || {};
   if (!name || typeof name !== "string") return res.status(400).json({ error: "name is required" });
+  let resolvedCreatorId =
+    creator_id != null && String(creator_id).trim() !== "" ? String(creator_id).trim() : null;
+  if (!resolvedCreatorId) {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (token) {
+      const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+      if (!authErr && user?.id) resolvedCreatorId = user.id;
+    }
+  }
+  if (!resolvedCreatorId) {
+    return res.status(400).json({
+      error:
+        "creator_id is required. Open the dashboard while logged in and use Add agent, or paste your creator ID.",
+    });
+  }
   const id = `agent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
   const githubRepoVal = github_repo && typeof github_repo === "string" ? github_repo.trim() || null : null;
   const row = {
@@ -420,7 +442,7 @@ app.post("/api/agents", async (req, res) => {
     short_description: shortDescription != null ? String(shortDescription).trim() : null,
     price_per_run: typeof pricePerRun === "number" ? pricePerRun : parseInt(pricePerRun, 10) || 0,
     system_prompt: system_prompt && typeof system_prompt === "string" ? system_prompt.trim() : "You are a helpful assistant.",
-    creator_id: creator_id || null,
+    creator_id: resolvedCreatorId,
   };
   if (githubRepoVal) row.github_repo = githubRepoVal;
   let result = await supabase.from("agents").insert(row).select("id, name, category, short_description, price_per_run").single();

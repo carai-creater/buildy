@@ -20,81 +20,64 @@
       <section class="page-main">
         <h1>Agents</h1>
         <p class="page-lead">
-          Choose from specialized AI agents, install and run them in one click. Filter by keyword or category.
+          Agents published by creators on Buildy. Run them from the home page or here.
         </p>
 
-        <div class="page-card-grid">
-          <article class="page-agent-card">
-            <span class="badge subtle">Market research</span>
-            <h2>Market Research Agent</h2>
-            <p class="page-agent-desc">
-              From web research to competitor comparison and insights—automated reports. Just describe what you need.
-            </p>
-            <ul class="page-agent-meta">
-              <li>Fetches latest data from the web</li>
-              <li>Output ready for slides</li>
-            </ul>
-            <p class="page-agent-price">¥500 / run</p>
-            <a href="./index.html" class="btn primary-btn">Try it</a>
-          </article>
-
-          <article class="page-agent-card">
-            <span class="badge subtle">SNS</span>
-            <h2>SNS Marketing Agent</h2>
-            <p class="page-agent-desc">
-              Generates post ideas, hashtags, and content calendars. Adapts to your brand voice.
-            </p>
-            <ul class="page-agent-meta">
-              <li>Instagram / X / TikTok</li>
-              <li>Weekly calendar output</li>
-            </ul>
-            <p class="page-agent-price">¥300 / run</p>
-            <a href="./index.html" class="btn primary-btn">Try it</a>
-          </article>
-
-          <article class="page-agent-card">
-            <span class="badge subtle">Dev & QA</span>
-            <h2>Code Review Agent</h2>
-            <p class="page-agent-desc">
-              Analyzes GitHub repos and suggests improvements and potential bugs. Supports major languages and frameworks.
-            </p>
-            <ul class="page-agent-meta">
-              <li>PR-level review</li>
-              <li>Security-focused feedback</li>
-            </ul>
-            <p class="page-agent-price">¥800 / run</p>
-            <a href="./index.html" class="btn primary-btn">Try it</a>
-          </article>
-
-          <article class="page-agent-card">
-            <span class="badge subtle">Sales</span>
-            <h2>Sales Email Agent</h2>
-            <p class="page-agent-desc">
-              Drafts follow-up emails and proposals tailored to the recipient and context.
-            </p>
-            <ul class="page-agent-meta">
-              <li>Template-based customization</li>
-              <li>Multi-language</li>
-            </ul>
-            <p class="page-agent-price">¥400 / run</p>
-            <a href="./index.html" class="btn primary-btn">Try it</a>
-          </article>
-
-          <article class="page-agent-card">
-            <span class="badge subtle">Documents</span>
-            <h2>Summarize & Slide Agent</h2>
-            <p class="page-agent-desc">
-              Summarizes long reports and meeting notes, outputs slide outlines and headings.
-            </p>
-            <ul class="page-agent-meta">
-              <li>Markdown / PDF input</li>
-              <li>Configurable slide count</li>
-            </ul>
-            <p class="page-agent-price">¥600 / run</p>
-            <a href="./index.html" class="btn primary-btn">Try it</a>
-          </article>
+        <div id="agents-empty" class="page-empty" style="display: none;">
+          <p>No creator-published agents yet.</p>
+          <p>
+            <a href="./creators-register-en.html" class="btn primary-btn">Sign up as a creator</a>
+            then <a href="./agent-add-en.html">add an agent</a>.
+          </p>
         </div>
+        <div id="agents-grid" class="page-card-grid"></div>
       </section>
     </main>
+    <script>
+      (function () {
+        var grid = document.getElementById("agents-grid");
+        var empty = document.getElementById("agents-empty");
+        fetch("/api/agents")
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            var agents = data.agents || [];
+            if (agents.length === 0) {
+              empty.style.display = "block";
+              return;
+            }
+            grid.innerHTML = agents
+              .map(function (a) {
+                return (
+                  '<article class="page-agent-card">' +
+                  '<span class="badge subtle">' +
+                  escapeHtml(a.category || "Other") +
+                  "</span>" +
+                  "<h2>" +
+                  escapeHtml(a.name) +
+                  "</h2>" +
+                  '<p class="page-agent-desc">' +
+                  escapeHtml(a.shortDescription || "") +
+                  "</p>" +
+                  '<p class="page-agent-price">¥' +
+                  (Number(a.pricePerRun) || 0) +
+                  " / run</p>" +
+                  '<a href="./index.html" class="btn primary-btn">Try it</a>' +
+                  "</article>"
+                );
+              })
+              .join("");
+          })
+          .catch(function () {
+            empty.style.display = "block";
+            empty.innerHTML =
+              "<p>Could not load the list.</p><p><a href=\"./creators-register-en.html\">Sign up</a> · <a href=\"./agent-add-en.html\">Add agent</a></p>";
+          });
+        function escapeHtml(s) {
+          var div = document.createElement("div");
+          div.textContent = s;
+          return div.innerHTML;
+        }
+      })();
+    </script>
   </body>
 </html>

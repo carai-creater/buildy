@@ -41,19 +41,35 @@
           <input id="pricePerRun" name="pricePerRun" type="number" min="0" value="0" />
           <label for="system_prompt">System prompt (for the LLM)</label>
           <textarea id="system_prompt" name="system_prompt" rows="4" placeholder="You are a helpful assistant. ..."></textarea>
-          <label for="creator_id">Creator ID (paste the ID shown after signup)</label>
-          <input id="creator_id" name="creator_id" type="text" placeholder="uuid" />
+          <label for="creator_id">Creator ID (auto-filled when logged in; edit only for another account)</label>
+          <input id="creator_id" name="creator_id" type="text" placeholder="uuid" autocomplete="off" />
           <input id="github_repo" name="github_repo" type="hidden" />
           <button type="submit" class="btn primary-btn">Add agent</button>
         </form>
         <p id="agent-result" style="margin-top: 1rem;"></p>
       </section>
     </main>
+    <script src="./auth-storage.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script>
-      try {
-        const saved = localStorage.getItem("buildy_creator_id");
-        if (saved) document.getElementById("creator_id").placeholder = saved;
-      } catch (_) {}
+      (function () {
+        var el = document.getElementById("creator_id");
+        if (!el) return;
+        var saved =
+          typeof window.buildyGetStoredCreatorId === "function"
+            ? window.buildyGetStoredCreatorId()
+            : (function () {
+                try {
+                  return sessionStorage.getItem("buildy_creator_id") || localStorage.getItem("buildy_creator_id") || "";
+                } catch (_) {
+                  return "";
+                }
+              })();
+        if (saved) {
+          el.placeholder = saved;
+          if (!el.value.trim()) el.value = saved;
+        }
+      })();
       const githubRepoInput = document.getElementById("github-repo");
       const githubFetchBtn = document.getElementById("github-fetch-btn");
       const githubFetchResult = document.getElementById("github-fetch-result");
@@ -94,8 +110,17 @@
       }
       document.getElementById("agent-form").addEventListener("submit", function (e) {
         e.preventDefault();
-        const creatorId = document.getElementById("creator_id").value.trim() || undefined;
-        const payload = {
+        var creatorId = document.getElementById("creator_id").value.trim();
+        if (!creatorId && typeof window.buildyGetStoredCreatorId === "function") {
+          creatorId = window.buildyGetStoredCreatorId();
+        }
+        if (!creatorId) {
+          try {
+            creatorId = sessionStorage.getItem("buildy_creator_id") || localStorage.getItem("buildy_creator_id") || "";
+          } catch (_) {}
+        }
+        creatorId = creatorId ? creatorId.trim() : "";
+        var payload = {
           name: document.getElementById("name").value.trim(),
           category: document.getElementById("category").value.trim() || undefined,
           shortDescription: document.getElementById("shortDescription").value.trim() || undefined,
@@ -104,23 +129,55 @@
           creator_id: creatorId || undefined,
           github_repo: (hiddenGithubRepo && hiddenGithubRepo.value) ? hiddenGithubRepo.value.trim() : undefined,
         };
-        const resultEl = document.getElementById("agent-result");
+        var resultEl = document.getElementById("agent-result");
         resultEl.textContent = "Adding…";
-        fetch("/api/agents", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-          .then((r) => r.json())
-          .then((data) => {
+        resultEl.style.color = "";
+        fetch("/api/config")
+          .then(function (r) { return r.json(); })
+          .then(function (config) {
+            if (!config.supabaseUrl || !config.supabaseAnonKey) {
+              return Promise.resolve({ token: null });
+            }
+            var storage =
+              typeof window.buildyGetAuthStorage === "function" ? window.buildyGetAuthStorage() : localStorage;
+            var sb = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+              auth: { storage: storage, persistSession: true, autoRefreshToken: true },
+            });
+            return sb.auth.getSession().then(function (res) {
+              var tok = res.data && res.data.session && res.data.session.access_token;
+              return { token: tok || null };
+            });
+          })
+          .then(function (ctx) {
+            if (!payload.creator_id && !ctx.token) {
+              resultEl.textContent =
+                "No creator ID. Sign in to the dashboard or paste the ID from creator signup.";
+              resultEl.style.color = "#c00";
+              return;
+            }
+            var headers = { "Content-Type": "application/json" };
+            if (ctx.token) headers["Authorization"] = "Bearer " + ctx.token;
+            return fetch("/api/agents", { method: "POST", headers: headers, body: JSON.stringify(payload) });
+          })
+          .then(function (r) {
+            if (!r) return;
+            return r.json();
+          })
+          .then(function (data) {
+            if (!data) return;
             if (data.agent) {
-              resultEl.innerHTML = "Added: " + data.agent.name + " → <a href=\"./creator-dashboard-en.html\">Dashboard</a> / <a href=\"./agents-en.html\">List</a>";
+              resultEl.innerHTML =
+                "Added: " +
+                data.agent.name +
+                " → <a href=\"./creator-dashboard-en.html\">Dashboard</a> / <a href=\"./agents-en.html\">List</a>";
             } else {
               resultEl.textContent = "Error: " + (data.error || "Could not add agent");
+              resultEl.style.color = "#c00";
             }
           })
-          .catch(() => {
+          .catch(function () {
             resultEl.textContent = "Network error.";
+            resultEl.style.color = "#c00";
           });
       });
     </script>

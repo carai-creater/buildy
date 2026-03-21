@@ -80,11 +80,11 @@ export async function POST(req: NextRequest) {
     const supabase = getSupabaseServer();
     const { data: agent, error: agentError } = await supabase
       .from("agents")
-      .select("id, system_prompt")
+      .select("id, system_prompt, creator_id")
       .eq("id", agent_id)
       .single();
 
-    if (agentError || !agent) {
+    if (agentError || !agent || !agent.creator_id) {
       console.warn("[Buildy execute] Agent not found:", agent_id, agentError?.message);
       return NextResponse.json(
         { error: "agent_not_found", message: "指定されたエージェントが見つかりません。" },
