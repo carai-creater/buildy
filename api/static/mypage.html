@@ -184,7 +184,9 @@
                   "<h2>" + name + "</h2>" +
                   '<p class="page-agent-desc">' + desc + "</p>" +
                   '<p class="page-agent-price">¥' + price + " / 実行</p>" +
-                  '<p style="margin-top: 0.75rem;"><a href="./index-ja.html" class="btn primary-btn">使う</a></p>' +
+                  '<p style="margin-top: 0.75rem;"><a href="./pay.html?agent=' +
+                  encodeURIComponent(a.id) +
+                  '" class="btn primary-btn">使う</a></p>' +
                   "</article>"
                 );
               })

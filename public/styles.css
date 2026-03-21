@@ -162,6 +162,20 @@ button {
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
 }
 
+.btn.secondary-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  color: var(--text-main);
+}
+
+.btn.secondary-btn:hover {
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+}
+
+.page-main--narrow {
+  max-width: 40rem;
+}
+
 .btn.text-btn {
   background: transparent;
   color: var(--text-sub);

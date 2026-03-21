@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { consumeGrantForExecute } from "@/lib/agent-execute-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,8 @@ type ExecuteBody = {
   user_message?: string;
   conversation_id?: string;
   stream?: boolean;
+  /** 有料エージェント用（Tempo 決済後に発行）。ヘッダー X-Buildy-Access-Token でも可 */
+  payment_access_token?: string;
 };
 
 function getClientId(req: NextRequest): string {
@@ -58,7 +61,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { agent_id, messages: bodyMessages, user_message, conversation_id, stream = true } = body;
+  const {
+    agent_id,
+    messages: bodyMessages,
+    user_message,
+    conversation_id,
+    stream = true,
+    payment_access_token: paymentAccessBody,
+  } = body;
 
   if (!agent_id || typeof agent_id !== "string") {
     return NextResponse.json(
@@ -80,7 +90,7 @@ export async function POST(req: NextRequest) {
     const supabase = getSupabaseServer();
     const { data: agent, error: agentError } = await supabase
       .from("agents")
-      .select("id, system_prompt, creator_id")
+      .select("id, system_prompt, creator_id, price_per_run")
       .eq("id", agent_id)
       .single();
 
@@ -89,6 +99,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "agent_not_found", message: "指定されたエージェントが見つかりません。" },
         { status: 404 }
+      );
+    }
+
+    const paymentHeader =
+      req.headers.get("x-buildy-access-token") ||
+      (typeof paymentAccessBody === "string" ? paymentAccessBody : null);
+    const grantCheck = await consumeGrantForExecute(
+      agent_id,
+      Number(agent.price_per_run) || 0,
+      paymentHeader
+    );
+    if (!grantCheck.ok) {
+      return NextResponse.json(
+        { error: "payment_required", message: grantCheck.message },
+        { status: grantCheck.status }
       );
     }
 

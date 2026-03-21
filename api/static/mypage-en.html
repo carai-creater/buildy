@@ -184,7 +184,9 @@
                   "<h2>" + name + "</h2>" +
                   '<p class="page-agent-desc">' + desc + "</p>" +
                   '<p class="page-agent-price">¥' + price + " / run</p>" +
-                  '<p style="margin-top: 0.75rem;"><a href="./index.html" class="btn primary-btn">Use</a></p>' +
+                  '<p style="margin-top: 0.75rem;"><a href="./pay-en.html?agent=' +
+                  encodeURIComponent(a.id) +
+                  '" class="btn primary-btn">Use</a></p>' +
                   "</article>"
                 );
               })

@@ -3,6 +3,16 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
+import {
+  getTempoDefaults,
+  yenToUsdAtomic,
+  randomOrderId,
+  verifyTip20TransferWithMemo,
+  signAccessToken,
+} from "./lib/tempo-payment.js";
+
+/** Vercel サーバーレスでテーブル未作成時のフォールバック用（本番は Supabase の SQL を実行してください） */
+const tempoIntentMemory = new Map();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -130,6 +140,197 @@ app.get("/api/agents/:id", async (req, res) => {
       hero: data.hero,
       system_prompt: data.system_prompt,
     },
+  });
+});
+
+// --- Tempo 決済（TIP-20 transferWithMemo）: https://tempo.xyz/
+app.post("/api/payments/tempo/intent", async (req, res) => {
+  const agentId = (req.body?.agentId || req.body?.agent_id || "").toString().trim();
+  if (!agentId) return res.status(400).json({ error: "agentId is required" });
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+
+  const { data: agent, error: agentErr } = await supabase
+    .from("agents")
+    .select("id, name, short_description, price_per_run, creator_id")
+    .eq("id", agentId)
+    .single();
+  if (agentErr || !agent || !agent.creator_id) {
+    return res.status(404).json({ error: "Agent not found" });
+  }
+
+  const priceYen = Number(agent.price_per_run) || 0;
+  if (priceYen <= 0) {
+    return res.json({
+      free: true,
+      agent: {
+        id: agent.id,
+        name: agent.name,
+        shortDescription: agent.short_description || "",
+        pricePerRunYen: 0,
+      },
+      message: "このエージェントは無料です。一覧からそのまま利用ページへ進めます。",
+    });
+  }
+
+  const cfg = getTempoDefaults();
+  if (!cfg.receiver) {
+    return res.status(503).json({
+      error: "BUILDY_TEMPO_RECEIVER is not set",
+      message: "決済先ウォレットが未設定です。環境変数 BUILDY_TEMPO_RECEIVER を設定してください。",
+    });
+  }
+
+  const { usd, atomic } = yenToUsdAtomic(priceYen);
+  const orderId = randomOrderId();
+  const memoLabel = `by-${orderId}`;
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
+  const row = {
+    order_id: orderId,
+    agent_id: agent.id,
+    amount_usd_atomic: atomic,
+    memo_label: memoLabel,
+    expires_at: expiresAt,
+  };
+
+  const { error: insErr } = await supabase.from("tempo_payment_intents").insert(row);
+  if (insErr) {
+    if (/relation|does not exist/i.test(insErr.message || "")) {
+      return res.status(503).json({
+        error: "tempo_payment_intents missing",
+        message: "Supabase で docs/supabase-tempo-payments.sql を実行してください。",
+      });
+    }
+    // その他の一時エラー時はメモリに保持（開発用・非推奨）
+    tempoIntentMemory.set(orderId, { ...row, agent_name: agent.name });
+  }
+
+  res.json({
+    free: false,
+    orderId,
+    memoLabel,
+    amountUsd: usd,
+    amountAtomic: atomic,
+    decimals: 6,
+    tokenAddress: cfg.tokenAddress,
+    recipient: cfg.receiver,
+    chainId: cfg.chainId,
+    rpcUrl: cfg.rpcUrl,
+    explorerUrl: cfg.explorerBase,
+    tempoSiteUrl: "https://tempo.xyz/",
+    tempoDocsUrl: "https://docs.tempo.xyz/",
+    agent: {
+      id: agent.id,
+      name: agent.name,
+      shortDescription: agent.short_description || "",
+      pricePerRunYen: priceYen,
+    },
+    intentExpiresAt: expiresAt,
+  });
+});
+
+app.post("/api/payments/tempo/verify", async (req, res) => {
+  const orderId = (req.body?.orderId || req.body?.order_id || "").toString().trim();
+  const txHash = (req.body?.txHash || req.body?.tx_hash || "").toString().trim();
+  if (!orderId || !txHash) {
+    return res.status(400).json({ error: "orderId and txHash are required" });
+  }
+  if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
+
+  const secret = process.env.BUILDY_ACCESS_TOKEN_SECRET;
+  if (!secret) {
+    return res.status(503).json({
+      error: "BUILDY_ACCESS_TOKEN_SECRET is not set",
+      message: "アクセストークン署名用の秘密鍵を環境変数に設定してください。",
+    });
+  }
+
+  let intent = null;
+  const { data: intentRow, error: intentErr } = await supabase
+    .from("tempo_payment_intents")
+    .select("*")
+    .eq("order_id", orderId)
+    .maybeSingle();
+
+  if (!intentErr && intentRow) {
+    intent = intentRow;
+  } else {
+    const mem = tempoIntentMemory.get(orderId);
+    if (mem) {
+      intent = {
+        order_id: mem.order_id,
+        agent_id: mem.agent_id,
+        amount_usd_atomic: mem.amount_usd_atomic,
+        memo_label: mem.memo_label,
+        expires_at: mem.expires_at,
+      };
+    }
+  }
+
+  if (!intent) {
+    return res.status(404).json({ error: "order not found or expired" });
+  }
+  if (new Date(intent.expires_at).getTime() < Date.now()) {
+    return res.status(400).json({ error: "intent expired" });
+  }
+
+  const cfg = getTempoDefaults();
+  const v = await verifyTip20TransferWithMemo(txHash, {
+    recipient: cfg.receiver,
+    tokenAddress: cfg.tokenAddress,
+    minAtomic: intent.amount_usd_atomic,
+    memoLabel: intent.memo_label,
+    rpcUrl: cfg.rpcUrl,
+  });
+  if (!v.ok) {
+    return res.status(400).json({ error: v.error || "verification failed" });
+  }
+
+  const grantExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const grantRow = {
+    order_id: orderId,
+    agent_id: intent.agent_id,
+    payer_wallet: v.from,
+    tx_hash: txHash,
+    amount_usd_atomic: intent.amount_usd_atomic,
+    runs_remaining: 1,
+    expires_at: grantExpires,
+  };
+
+  const { data: grant, error: gErr } = await supabase.from("tempo_access_grants").insert(grantRow).select("id").single();
+
+  let grantId;
+  if (gErr || !grant) {
+    if (/relation|does not exist/i.test(gErr?.message || "")) {
+      return res.status(503).json({
+        error: "tempo_access_grants missing",
+        message: "Supabase で docs/supabase-tempo-payments.sql を実行してください。",
+      });
+    }
+    if (/duplicate|unique|violates unique constraint/i.test(gErr?.message || "")) {
+      return res.status(400).json({ error: "この取引はすでに登録されています。" });
+    }
+    return res.status(400).json({ error: gErr?.message || "failed to save grant" });
+  }
+  grantId = grant.id;
+
+  await supabase.from("tempo_payment_intents").delete().eq("order_id", orderId);
+  tempoIntentMemory.delete(orderId);
+
+  const expSec = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+  const accessToken = signAccessToken(
+    { grantId, agentId: intent.agent_id, exp: expSec },
+    secret
+  );
+
+  res.json({
+    ok: true,
+    accessToken,
+    grantId,
+    agentId: intent.agent_id,
+    payerWallet: v.from,
+    expiresAt: grantExpires,
+    usePath: `./agent-use.html?agent=${encodeURIComponent(intent.agent_id)}`,
   });
 });
 

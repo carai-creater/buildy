@@ -20,7 +20,9 @@
       <section class="page-main">
         <h1>Agents</h1>
         <p class="page-lead">
-          Agents published by creators on Buildy. Run them from the home page or here.
+          Only creator-published agents are listed. Paid runs use
+          <a href="https://tempo.xyz/" target="_blank" rel="noopener noreferrer">Tempo</a>
+          checkout; free agents go straight to the use page.
         </p>
 
         <div id="agents-empty" class="page-empty" style="display: none;">
@@ -61,7 +63,9 @@
                   '<p class="page-agent-price">¥' +
                   (Number(a.pricePerRun) || 0) +
                   " / run</p>" +
-                  '<a href="./index.html" class="btn primary-btn">Try it</a>' +
+                  '<a href="./pay-en.html?agent=' +
+                  encodeURIComponent(a.id) +
+                  '" class="btn primary-btn">Pay with Tempo to use</a>' +
                   "</article>"
                 );
               })

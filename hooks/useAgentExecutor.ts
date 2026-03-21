@@ -10,6 +10,8 @@ export type ExecuteOptions = {
   user_message?: string;
   conversation_id?: string;
   stream?: boolean;
+  /** Tempo 決済後のアクセストークン（有料エージェント）。省略時は sessionStorage `buildy_tempo_access_<agent_id>` を試す */
+  payment_access_token?: string;
 };
 
 export type AgentExecutorState = {
@@ -30,20 +32,40 @@ export function useAgentExecutor() {
   const [state, setState] = useState<AgentExecutorState>(defaultState);
 
   const execute = useCallback(async (options: ExecuteOptions) => {
-    const { agent_id, messages, user_message, conversation_id, stream = true } = options;
+    const {
+      agent_id,
+      messages,
+      user_message,
+      conversation_id,
+      stream = true,
+      payment_access_token: paymentAccess,
+    } = options;
 
     setState((s) => ({ ...s, isLoading: true, error: null, content: "", done: false }));
 
+    let paymentToken = paymentAccess;
+    if (!paymentToken && typeof window !== "undefined") {
+      try {
+        paymentToken = sessionStorage.getItem(`buildy_tempo_access_${agent_id}`) ?? undefined;
+      } catch {
+        /* ignore */
+      }
+    }
+
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (paymentToken) headers["X-Buildy-Access-Token"] = paymentToken;
+
       const res = await fetch("/api/agent/execute", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           agent_id,
           messages,
           user_message,
           conversation_id,
           stream,
+          payment_access_token: paymentToken,
         }),
       });
 

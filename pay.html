@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tempo で決済 | Buildy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <a href="./index-ja.html" class="page-logo">Buildy</a>
+        <nav class="page-nav">
+          <a href="./agents.html">エージェント一覧</a>
+          <a href="./pay-en.html" class="page-lang">English</a>
+        </nav>
+      </header>
+      <section class="page-main page-main--narrow">
+        <h1>Tempo で決済</h1>
+        <p class="page-lead">
+          有料エージェントは <a href="https://tempo.xyz/" target="_blank" rel="noopener noreferrer">Tempo</a> 上のステーブルコイン（TIP-20）でお支払いいただきます。決済完了後、Buildy 上でエージェントを実行できます。
+        </p>
+
+        <div id="state-loading" class="page-empty"><p>読み込み中…</p></div>
+        <div id="state-error" class="page-empty" style="display: none;"></div>
+        <div id="state-free" class="page-card" style="display: none;">
+          <p>このエージェントは無料です。利用ページへ移動します。</p>
+        </div>
+        <div id="state-pay" class="page-card" style="display: none;">
+          <h2 id="agent-name"></h2>
+          <p id="agent-desc" class="page-agent-desc"></p>
+          <p><strong>表示価格（参考・円）</strong>: ¥<span id="price-yen">0</span></p>
+          <p><strong>お支払い額（pathUSD 目安）</strong>: $<span id="price-usd">0</span></p>
+          <p class="page-note" style="font-size: 14px; color: var(--text-sub);">
+            メモ（注文ID）<code id="memo-display"></code> を必ず <code>transferWithMemo</code> に含めてください。送金先は Buildy の受取アドレスです。
+          </p>
+          <ul class="page-list" style="margin: 1rem 0; padding-left: 1.25rem;">
+            <li>ネットワーク: Tempo（Chain ID <span id="chain-id"></span>）</li>
+            <li>トークン（pathUSD）: <code id="token-addr" style="word-break: break-all;"></code></li>
+            <li>受取アドレス: <code id="recv-addr" style="word-break: break-all;"></code></li>
+            <li>詳細: <a href="https://docs.tempo.xyz/" target="_blank" rel="noopener noreferrer">Tempo Docs</a></li>
+          </ul>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem;">
+            <button type="button" id="btn-wallet" class="btn primary-btn">ウォレットを接続</button>
+            <button type="button" id="btn-pay" class="btn secondary-btn" disabled>Tempo で送金（transferWithMemo）</button>
+          </div>
+          <p id="wallet-status" style="margin-top: 0.75rem; font-size: 14px; color: var(--text-sub);"></p>
+          <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid var(--border-soft);" />
+          <label for="tx-hash">トランザクションハッシュ（送金後）</label>
+          <input id="tx-hash" type="text" placeholder="0x..." style="width: 100%; max-width: 42rem; padding: 0.5rem; margin-top: 0.35rem;" />
+          <p style="margin-top: 1rem;">
+            <button type="button" id="btn-verify" class="btn primary-btn">決済を確認して利用権を取得</button>
+          </p>
+          <p id="verify-result" style="margin-top: 0.75rem; font-size: 14px;"></p>
+          <p id="next-step" style="margin-top: 1rem; display: none;">
+            <a id="use-link" href="#" class="btn primary-btn">エージェントを利用する</a>
+          </p>
+        </div>
+      </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js" crossorigin="anonymous"></script>
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var agentId = params.get("agent");
+        var loading = document.getElementById("state-loading");
+        var errEl = document.getElementById("state-error");
+        var freeEl = document.getElementById("state-free");
+        var payEl = document.getElementById("state-pay");
+        var intent = null;
+
+        function showError(msg) {
+          loading.style.display = "none";
+          errEl.style.display = "block";
+          errEl.innerHTML = "<p>" + msg + "</p>";
+        }
+
+        if (!agentId) {
+          showError("URL に <code>?agent=エージェントID</code> を指定してください。");
+          return;
+        }
+
+        fetch("/api/payments/tempo/intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ agentId: agentId }),
+        })
+          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (_ref) {
+            var ok = _ref.ok;
+            var data = _ref.j;
+            loading.style.display = "none";
+            if (!ok) {
+              showError((data && data.message) || data.error || "インテントの作成に失敗しました。");
+              return;
+            }
+            if (data.free) {
+              freeEl.style.display = "block";
+              window.location.replace("./agent-use.html?agent=" + encodeURIComponent(agentId));
+              return;
+            }
+            intent = data;
+            payEl.style.display = "block";
+            document.getElementById("agent-name").textContent = data.agent.name;
+            document.getElementById("agent-desc").textContent = data.agent.shortDescription || "";
+            document.getElementById("price-yen").textContent = String(data.agent.pricePerRunYen);
+            document.getElementById("price-usd").textContent = String(data.amountUsd);
+            document.getElementById("memo-display").textContent = data.memoLabel;
+            document.getElementById("chain-id").textContent = String(data.chainId);
+            document.getElementById("token-addr").textContent = data.tokenAddress;
+            document.getElementById("recv-addr").textContent = data.recipient;
+
+            var btnWallet = document.getElementById("btn-wallet");
+            var btnPay = document.getElementById("btn-pay");
+            var walletStatus = document.getElementById("wallet-status");
+            var provider = null;
+            var signer = null;
+
+            btnWallet.addEventListener("click", async function () {
+              if (!window.ethereum) {
+                walletStatus.textContent = "MetaMask 等のウォレット拡張が必要です。";
+                return;
+              }
+              try {
+                var cid = "0x" + Number(data.chainId).toString(16);
+                await window.ethereum.request({
+                  method: "wallet_addEthereumChain",
+                  params: [
+                    {
+                      chainId: cid,
+                      chainName: data.chainId === 4217 ? "Tempo Mainnet" : "Tempo Moderato (Testnet)",
+                      rpcUrls: [data.rpcUrl],
+                      nativeCurrency: { name: "USD", symbol: "USD", decimals: 18 },
+                    },
+                  ],
+                });
+              } catch (e) {
+                console.warn(e);
+              }
+              try {
+                await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0x" + Number(data.chainId).toString(16) }] });
+              } catch (e) {
+                walletStatus.textContent = "ネットワークの切り替えに失敗しました: " + (e.message || e);
+                return;
+              }
+              provider = new ethers.BrowserProvider(window.ethereum);
+              signer = await provider.getSigner();
+              walletStatus.textContent = "接続済み: " + (await signer.getAddress());
+              btnPay.disabled = false;
+            });
+
+            btnPay.addEventListener("click", async function () {
+              if (!signer || !intent) return;
+              btnPay.disabled = true;
+              try {
+                var tip20 = new ethers.Contract(
+                  data.tokenAddress,
+                  [
+                    "function transferWithMemo(address to, uint256 amount, bytes32 memo)",
+                    "function decimals() view returns (uint8)",
+                  ],
+                  signer
+                );
+                var memo = ethers.encodeBytes32String(data.memoLabel.slice(0, 31));
+                var tx = await tip20.transferWithMemo(data.recipient, data.amountAtomic, memo);
+                walletStatus.textContent = "送信中… " + tx.hash;
+                document.getElementById("tx-hash").value = tx.hash;
+                await tx.wait();
+                walletStatus.textContent = "送金が完了しました。下の「決済を確認」を押してください。";
+              } catch (e) {
+                console.error(e);
+                walletStatus.textContent = "送金エラー: " + (e.shortMessage || e.message || e);
+              } finally {
+                btnPay.disabled = false;
+              }
+            });
+
+            document.getElementById("btn-verify").addEventListener("click", function () {
+              var tx = document.getElementById("tx-hash").value.trim();
+              var out = document.getElementById("verify-result");
+              if (!tx) {
+                out.textContent = "トランザクションハッシュを入力してください。";
+                return;
+              }
+              out.textContent = "確認中…";
+              fetch("/api/payments/tempo/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId: intent.orderId, txHash: tx }),
+              })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                .then(function (_ref2) {
+                  var ok = _ref2.ok;
+                  var v = _ref2.j;
+                  if (!ok) {
+                    out.textContent = v.error || "確認に失敗しました。";
+                    out.style.color = "#c00";
+                    return;
+                  }
+                  out.style.color = "";
+                  out.textContent = "決済を確認しました。アクセストークンを保存しました。";
+                  try {
+                    sessionStorage.setItem("buildy_tempo_access_" + agentId, v.accessToken);
+                  } catch (_) {}
+                  var next = document.getElementById("next-step");
+                  var link = document.getElementById("use-link");
+                  next.style.display = "block";
+                  link.href = "./agent-use.html?agent=" + encodeURIComponent(agentId);
+                })
+                .catch(function () {
+                  out.textContent = "ネットワークエラー";
+                  out.style.color = "#c00";
+                });
+            });
+          })
+          .catch(function () {
+            showError("通信に失敗しました。");
+          });
+      })();
+    </script>
+  </body>
+</html>

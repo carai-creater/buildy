@@ -38,6 +38,9 @@ Buildy でクリエイター登録・エージェント一覧を使うには、S
 ## 3. テーブルを作成する
 
 1. 左メニューで **SQL Editor** を開く。
+
+   - クリエイター・エージェント用: `docs/supabase-agents.sql` など既存の SQL を実行。
+   - **Tempo 決済**を使う場合は追加で `docs/supabase-tempo-payments.sql` を実行（手順は [tempo-setup.md](./tempo-setup.md)）。
 2. **New query** で新規クエリを作成する。
 3. リポジトリの次のファイルの内容をコピーして実行する:
    - `docs/supabase-agents.sql` … `creators` と `agents` テーブルを作成

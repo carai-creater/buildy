@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pay with Tempo | Buildy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <a href="./index.html" class="page-logo">Buildy</a>
+        <nav class="page-nav">
+          <a href="./agents-en.html">Agents</a>
+          <a href="./pay.html" class="page-lang">日本語</a>
+        </nav>
+      </header>
+      <section class="page-main page-main--narrow">
+        <h1>Pay with Tempo</h1>
+        <p class="page-lead">
+          Paid agents are billed in stablecoins on
+          <a href="https://tempo.xyz/" target="_blank" rel="noopener noreferrer">Tempo</a> (TIP-20). After payment is verified, you can run the agent on Buildy.
+        </p>
+
+        <div id="state-loading" class="page-empty"><p>Loading…</p></div>
+        <div id="state-error" class="page-empty" style="display: none;"></div>
+        <div id="state-free" class="page-card" style="display: none;">
+          <p>This agent is free. Redirecting…</p>
+        </div>
+        <div id="state-pay" class="page-card" style="display: none;">
+          <h2 id="agent-name"></h2>
+          <p id="agent-desc" class="page-agent-desc"></p>
+          <p><strong>List price (JPY)</strong>: ¥<span id="price-yen">0</span></p>
+          <p><strong>Amount (pathUSD, approx.)</strong>: $<span id="price-usd">0</span></p>
+          <p class="page-note" style="font-size: 14px; color: var(--text-sub);">
+            Include memo <code id="memo-display"></code> in <code>transferWithMemo</code>. Recipient is Buildy’s wallet.
+          </p>
+          <ul class="page-list" style="margin: 1rem 0; padding-left: 1.25rem;">
+            <li>Network: Tempo (Chain ID <span id="chain-id"></span>)</li>
+            <li>Token (pathUSD): <code id="token-addr" style="word-break: break-all;"></code></li>
+            <li>Recipient: <code id="recv-addr" style="word-break: break-all;"></code></li>
+            <li><a href="https://docs.tempo.xyz/" target="_blank" rel="noopener noreferrer">Tempo Docs</a></li>
+          </ul>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem;">
+            <button type="button" id="btn-wallet" class="btn primary-btn">Connect wallet</button>
+            <button type="button" id="btn-pay" class="btn secondary-btn" disabled>Send via transferWithMemo</button>
+          </div>
+          <p id="wallet-status" style="margin-top: 0.75rem; font-size: 14px; color: var(--text-sub);"></p>
+          <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid var(--border-soft);" />
+          <label for="tx-hash">Transaction hash (after sending)</label>
+          <input id="tx-hash" type="text" placeholder="0x..." style="width: 100%; max-width: 42rem; padding: 0.5rem; margin-top: 0.35rem;" />
+          <p style="margin-top: 1rem;">
+            <button type="button" id="btn-verify" class="btn primary-btn">Verify payment &amp; unlock access</button>
+          </p>
+          <p id="verify-result" style="margin-top: 0.75rem; font-size: 14px;"></p>
+          <p id="next-step" style="margin-top: 1rem; display: none;">
+            <a id="use-link" href="#" class="btn primary-btn">Open agent</a>
+          </p>
+        </div>
+      </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js" crossorigin="anonymous"></script>
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var agentId = params.get("agent");
+        var loading = document.getElementById("state-loading");
+        var errEl = document.getElementById("state-error");
+        var freeEl = document.getElementById("state-free");
+        var payEl = document.getElementById("state-pay");
+        var intent = null;
+
+        function showError(msg) {
+          loading.style.display = "none";
+          errEl.style.display = "block";
+          errEl.innerHTML = "<p>" + msg + "</p>";
+        }
+
+        if (!agentId) {
+          showError("Add <code>?agent=AGENT_ID</code> to the URL.");
+          return;
+        }
+
+        fetch("/api/payments/tempo/intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ agentId: agentId }),
+        })
+          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (_ref) {
+            var ok = _ref.ok;
+            var data = _ref.j;
+            loading.style.display = "none";
+            if (!ok) {
+              showError((data && data.message) || data.error || "Could not start checkout.");
+              return;
+            }
+            if (data.free) {
+              freeEl.style.display = "block";
+              window.location.replace("./agent-use-en.html?agent=" + encodeURIComponent(agentId));
+              return;
+            }
+            intent = data;
+            payEl.style.display = "block";
+            document.getElementById("agent-name").textContent = data.agent.name;
+            document.getElementById("agent-desc").textContent = data.agent.shortDescription || "";
+            document.getElementById("price-yen").textContent = String(data.agent.pricePerRunYen);
+            document.getElementById("price-usd").textContent = String(data.amountUsd);
+            document.getElementById("memo-display").textContent = data.memoLabel;
+            document.getElementById("chain-id").textContent = String(data.chainId);
+            document.getElementById("token-addr").textContent = data.tokenAddress;
+            document.getElementById("recv-addr").textContent = data.recipient;
+
+            var btnWallet = document.getElementById("btn-wallet");
+            var btnPay = document.getElementById("btn-pay");
+            var walletStatus = document.getElementById("wallet-status");
+            var signer = null;
+
+            btnWallet.addEventListener("click", async function () {
+              if (!window.ethereum) {
+                walletStatus.textContent = "Install a wallet extension (e.g. MetaMask).";
+                return;
+              }
+              try {
+                await window.ethereum.request({
+                  method: "wallet_addEthereumChain",
+                  params: [
+                    {
+                      chainId: "0x" + Number(data.chainId).toString(16),
+                      chainName: data.chainId === 4217 ? "Tempo Mainnet" : "Tempo Moderato (Testnet)",
+                      rpcUrls: [data.rpcUrl],
+                      nativeCurrency: { name: "USD", symbol: "USD", decimals: 18 },
+                    },
+                  ],
+                });
+              } catch (e) {
+                console.warn(e);
+              }
+              try {
+                await window.ethereum.request({
+                  method: "wallet_switchEthereumChain",
+                  params: [{ chainId: "0x" + Number(data.chainId).toString(16) }],
+                });
+              } catch (e) {
+                walletStatus.textContent = "Could not switch network: " + (e.message || e);
+                return;
+              }
+              var provider = new ethers.BrowserProvider(window.ethereum);
+              signer = await provider.getSigner();
+              walletStatus.textContent = "Connected: " + (await signer.getAddress());
+              btnPay.disabled = false;
+            });
+
+            btnPay.addEventListener("click", async function () {
+              if (!signer || !intent) return;
+              btnPay.disabled = true;
+              try {
+                var tip20 = new ethers.Contract(
+                  data.tokenAddress,
+                  [
+                    "function transferWithMemo(address to, uint256 amount, bytes32 memo)",
+                    "function decimals() view returns (uint8)",
+                  ],
+                  signer
+                );
+                var memo = ethers.encodeBytes32String(data.memoLabel.slice(0, 31));
+                var tx = await tip20.transferWithMemo(data.recipient, data.amountAtomic, memo);
+                walletStatus.textContent = "Pending… " + tx.hash;
+                document.getElementById("tx-hash").value = tx.hash;
+                await tx.wait();
+                walletStatus.textContent = "Confirmed. Click verify below.";
+              } catch (e) {
+                console.error(e);
+                walletStatus.textContent = "Error: " + (e.shortMessage || e.message || e);
+              } finally {
+                btnPay.disabled = false;
+              }
+            });
+
+            document.getElementById("btn-verify").addEventListener("click", function () {
+              var tx = document.getElementById("tx-hash").value.trim();
+              var out = document.getElementById("verify-result");
+              if (!tx) {
+                out.textContent = "Enter the transaction hash.";
+                return;
+              }
+              out.textContent = "Verifying…";
+              fetch("/api/payments/tempo/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId: intent.orderId, txHash: tx }),
+              })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                .then(function (_ref2) {
+                  var ok = _ref2.ok;
+                  var v = _ref2.j;
+                  if (!ok) {
+                    out.textContent = v.error || "Verification failed.";
+                    out.style.color = "#c00";
+                    return;
+                  }
+                  out.style.color = "";
+                  out.textContent = "Access unlocked. Token saved for this browser session.";
+                  try {
+                    sessionStorage.setItem("buildy_tempo_access_" + agentId, v.accessToken);
+                  } catch (_) {}
+                  document.getElementById("next-step").style.display = "block";
+                  document.getElementById("use-link").href =
+                    "./agent-use-en.html?agent=" + encodeURIComponent(agentId);
+                })
+                .catch(function () {
+                  out.textContent = "Network error";
+                  out.style.color = "#c00";
+                });
+            });
+          })
+          .catch(function () {
+            showError("Request failed.");
+          });
+      })();
+    </script>
+  </body>
+</html>

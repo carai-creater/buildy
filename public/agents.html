@@ -23,7 +23,9 @@
       <section class="page-main">
         <h1>エージェント一覧</h1>
         <p class="page-lead">
-          クリエイターが Buildy に公開したエージェントだけが表示されます。トップやここから実行できます。
+          クリエイターが Buildy に公開したエージェントだけが表示されます。有料は
+          <a href="https://tempo.xyz/" target="_blank" rel="noopener noreferrer">Tempo</a>
+          で決済後に利用できます（無料はそのまま利用ページへ）。
         </p>
 
         <div id="agents-empty" class="page-empty" style="display: none;">
@@ -53,7 +55,7 @@
             <h2>${escapeHtml(a.name)}</h2>
             <p class="page-agent-desc">${escapeHtml(a.shortDescription || "")}</p>
             <p class="page-agent-price">¥${Number(a.pricePerRun) || 0} / 実行</p>
-            <a href="./index-ja.html" class="btn primary-btn">使ってみる</a>
+            <a href="./pay.html?agent=${encodeURIComponent(a.id)}" class="btn primary-btn">Tempoで決済して利用</a>
           </article>
         `
               )

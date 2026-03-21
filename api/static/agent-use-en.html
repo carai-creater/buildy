@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Use agent | Buildy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <a href="./index.html" class="page-logo">Buildy</a>
+        <nav class="page-nav">
+          <a href="./agents-en.html">Agents</a>
+          <a href="./agent-use.html" class="page-lang">日本語</a>
+        </nav>
+      </header>
+      <section class="page-main page-main--narrow">
+        <div id="state-loading" class="page-empty"><p>Loading…</p></div>
+        <div id="state-need-pay" class="page-card" style="display: none;">
+          <h1 id="np-title"></h1>
+          <p>This agent is paid. Complete Tempo checkout first.</p>
+          <p><a id="np-pay" href="#" class="btn primary-btn">Pay with Tempo</a></p>
+        </div>
+        <div id="state-chat" style="display: none;">
+          <h1 id="ch-title"></h1>
+          <p id="ch-sub" class="page-lead" style="font-size: 14px;"></p>
+          <div id="ch-log" class="page-card" style="min-height: 8rem; white-space: pre-wrap; margin-bottom: 1rem;"></div>
+          <label for="ch-input">Message</label>
+          <textarea id="ch-input" rows="3" style="width: 100%; max-width: 42rem; padding: 0.5rem; margin-top: 0.35rem;"></textarea>
+          <p style="margin-top: 0.75rem;">
+            <button type="button" id="ch-send" class="btn primary-btn">Send</button>
+          </p>
+          <p id="ch-err" style="color: #c00; font-size: 14px;"></p>
+        </div>
+      </section>
+    </main>
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var agentId = params.get("agent");
+        if (!agentId) {
+          document.getElementById("state-loading").innerHTML = "<p>Add <code>?agent=</code> to the URL.</p>";
+          return;
+        }
+
+        function tokenKey() {
+          return "buildy_tempo_access_" + agentId;
+        }
+
+        fetch("/api/agents/" + encodeURIComponent(agentId))
+          .then(function (r) {
+            if (!r.ok) throw new Error("not found");
+            return r.json();
+          })
+          .then(function (data) {
+            var agent = data.agent;
+            if (!agent) throw new Error("not found");
+            var price = Number(agent.pricePerRun) || 0;
+            var token = null;
+            try {
+              token = sessionStorage.getItem(tokenKey());
+            } catch (_) {}
+
+            document.getElementById("state-loading").style.display = "none";
+
+            if (price > 0 && !token) {
+              var np = document.getElementById("state-need-pay");
+              np.style.display = "block";
+              document.getElementById("np-title").textContent = agent.name;
+              document.getElementById("np-pay").href = "./pay-en.html?agent=" + encodeURIComponent(agentId);
+              return;
+            }
+
+            var chat = document.getElementById("state-chat");
+            chat.style.display = "block";
+            document.getElementById("ch-title").textContent = agent.name;
+            document.getElementById("ch-sub").textContent =
+              price > 0
+                ? "Paid agent: using your checkout session (each run consumes one grant)."
+                : "Free to use.";
+
+            var logEl = document.getElementById("ch-log");
+            var errEl = document.getElementById("ch-err");
+
+            document.getElementById("ch-send").addEventListener("click", function () {
+              var text = document.getElementById("ch-input").value.trim();
+              if (!text) return;
+              errEl.textContent = "";
+              logEl.textContent += "\n\n[You]\n" + text;
+              var headers = { "Content-Type": "application/json" };
+              if (token) headers["X-Buildy-Access-Token"] = token;
+              fetch("/api/agent/execute", {
+                method: "POST",
+                headers: headers,
+                body: JSON.stringify({
+                  agent_id: agentId,
+                  user_message: text,
+                  stream: false,
+                }),
+              })
+                .then(function (r) {
+                  return r.json().then(function (j) {
+                    return { ok: r.ok, j: j };
+                  });
+                })
+                .then(function (_ref) {
+                  if (!_ref.ok) {
+                    errEl.textContent = _ref.j.message || _ref.j.error || "Run failed";
+                    return;
+                  }
+                  logEl.textContent += "\n\n[Agent]\n" + (_ref.j.content || "");
+                  document.getElementById("ch-input").value = "";
+                })
+                .catch(function () {
+                  errEl.textContent = "Network error (is Next.js /api/agent/execute available?)";
+                });
+            });
+          })
+          .catch(function () {
+            document.getElementById("state-loading").innerHTML = "<p>Agent not found.</p>";
+          });
+      })();
+    </script>
+  </body>
+</html>
