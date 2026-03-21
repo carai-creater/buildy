@@ -1,9 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  async redirects() {
-    return [{ source: "/", destination: "/index.html", permanent: false }];
-  },
+  // Default "/" → English landing is handled by middleware.ts (rewrite to /index.html).
 };
 
 export default nextConfig;

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Buildy — AIエージェントの民主化プラットフォーム",
+  title: "Buildy — AI Agent Marketplace",
   description:
-    "Buildy（ビルディ）は、AIエージェントを「作る人」と「使う人」をつなぐマーケットプレイス兼ノーコード・プラットフォームです。",
+    "Buildy connects people who build AI agents with people who want to use them. A no-code marketplace to discover and run specialized agents.",
 };
 
 export default function RootLayout({
@@ -12,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ja">
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

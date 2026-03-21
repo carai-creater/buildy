@@ -59,7 +59,7 @@
       const hiddenGithubRepo = document.getElementById("github_repo");
       if (githubFetchBtn && githubRepoInput) {
         githubFetchBtn.addEventListener("click", function () {
-          const url = githubRepoInput.value.trim();
+          var url = githubRepoInput.value.trim().replace(/\.git$/i, "").replace(/\/+$/, "").trim();
           if (!url) {
             githubFetchResult.textContent = "URL または owner/repo を入力してください。";
             return;

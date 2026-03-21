@@ -56,44 +56,45 @@ app.use((_req, res, next) => {
   next();
 });
 
-app.use(express.static(__dirname));
-app.use(express.static(path.join(__dirname, "..")));
 // Vercel の api 関数バンドル内の静的ファイル（api/static/ に配置）
 const apiStatic = path.join(__dirname, "api", "static");
-app.use(express.static(apiStatic));
 
-// Vercel では static が index を見つけられないことがあるため GET / を明示的に処理
-app.get("/", (req, res, next) => {
-  const roots = [apiStatic, __dirname, path.join(__dirname, ".."), process.cwd()];
-  const tried = roots.map((root) => {
-    const p = path.join(root, "index.html");
-    return { root, p, exists: fs.existsSync(p) };
-  });
+/** Prefer repo-root English landing, then public/, then api/static (default language: English). */
+function sendEnglishIndexHtml(res, next) {
+  const candidates = [
+    path.join(__dirname, "index.html"),
+    path.join(__dirname, "public", "index.html"),
+    path.join(apiStatic, "index.html"),
+    path.join(process.cwd(), "index.html"),
+  ];
+  const tried = candidates.map((p) => ({ p, exists: fs.existsSync(p) }));
   // #region agent log
   fetch("http://127.0.0.1:7621/ingest/1a015be2-eba8-436a-b6d2-cc397703420d", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "785dd1" },
     body: JSON.stringify({
       sessionId: "785dd1",
-      location: "server.js:GET /",
-      message: "GET / handler",
-      data: { path: req.path, tried, hypothesisId: "A" },
+      location: "server.js:sendEnglishIndexHtml",
+      message: "resolve English index.html",
+      data: { tried, hypothesisId: "A" },
       timestamp: Date.now(),
       hypothesisId: "A",
     }),
   }).catch(() => {});
   // #endregion
   for (const { p, exists } of tried) {
-    if (exists) return res.sendFile(p);
+    if (exists) return res.sendFile(path.resolve(p));
   }
   next();
-});
+}
 
-app.get("/index.html", (req, res, next) => {
-  const p = path.join(apiStatic, "index.html");
-  if (fs.existsSync(p)) return res.sendFile(p);
-  next();
-});
+// Before express.static: ensure "/" and "/index.html" are the English homepage, not another index.
+app.get("/", (req, res, next) => sendEnglishIndexHtml(res, next));
+app.get("/index.html", (req, res, next) => sendEnglishIndexHtml(res, next));
+
+app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, "..")));
+app.use(express.static(apiStatic));
 
 app.get("/api/agents", async (_req, res) => {
   if (!supabase) return res.json({ agents: [] });
@@ -377,6 +378,11 @@ app.get("/api/github/repo", async (req, res) => {
     return res.status(400).json({ error: "GitHub の URL を入力してください（https://github.com/owner/repo）" });
   }
   if (!ownerRepo || !ownerRepo.includes("/")) {
+    return res.status(400).json({ error: "リポジトリを「owner/repo」または「https://github.com/owner/repo」で指定してください" });
+  }
+  // clone 用 URL の末尾 .git は GitHub API で 404 になるため除去
+  ownerRepo = ownerRepo.replace(/\.git$/i, "").replace(/\/+$/, "").trim();
+  if (!ownerRepo.includes("/")) {
     return res.status(400).json({ error: "リポジトリを「owner/repo」または「https://github.com/owner/repo」で指定してください" });
   }
   try {
