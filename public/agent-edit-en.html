@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Edit agent | Buildy</title>
+    <title>Edit your agent | Buildy</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -14,17 +14,17 @@
           <a href="./index.html">Home</a>
           <a href="./agents-en.html">Agents</a>
           <a href="./creator-dashboard-en.html">Dashboard</a>
-          <a href="./agent-add-en.html">Add agent</a>
+          <a href="./agent-add-en.html">List an agent</a>
           <a href="./agent-edit.html" class="page-lang" id="agent-edit-lang-ja">日本語</a>
         </nav>
       </header>
       <section class="page-main">
-        <h1>Edit agent</h1>
+        <h1>Edit your agent</h1>
         <p id="edit-loading" class="page-lead">Loading…</p>
         <form id="agent-form" class="page-form" style="max-width: 32rem; display: none;">
           <label for="github_repo">GitHub repository *</label>
           <input id="github_repo" name="github_repo" type="text" required autocomplete="off" />
-          <label for="public_ui_url">End-user UI URL * (HTTPS)</label>
+          <label for="public_ui_url">Public app URL * (HTTPS)</label>
           <input id="public_ui_url" name="public_ui_url" type="url" required autocomplete="off" />
           <label for="name">Agent name *</label>
           <input id="name" name="name" type="text" required />
@@ -51,7 +51,7 @@
         const params = new URLSearchParams(location.search);
         const id = params.get("id");
         if (!id) {
-          document.getElementById("edit-loading").textContent = "No agent ID in the URL.";
+          document.getElementById("edit-loading").textContent = "Add an agent ID to the URL (e.g. ?id=…).";
           return;
         }
         const form = document.getElementById("agent-form");
@@ -136,7 +136,7 @@
             document.getElementById("public_ui_url").value = a.publicUiUrl || "";
           })
           .catch(() => {
-            loadingEl.textContent = "Could not load this agent.";
+            loadingEl.textContent = "We couldn't load this agent.";
           });
         form.addEventListener("submit", function (e) {
           e.preventDefault();
@@ -158,9 +158,9 @@
             .then((r) => r.json())
             .then((data) => {
               if (data.agent) {
-                resultEl.innerHTML = "Saved. → <a href=\"./creator-dashboard-en.html\">Dashboard</a>";
+                resultEl.innerHTML = "Saved. <a href=\"./creator-dashboard-en.html\">Back to dashboard</a>";
               } else {
-                resultEl.textContent = "Error: " + (data.error || "Save failed");
+                resultEl.textContent = "Error: " + (data.error || "Couldn't save changes");
               }
             })
             .catch(() => {

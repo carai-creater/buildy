@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Creator login | Buildy</title>
+    <title>Creator sign-in | Buildy</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -18,10 +18,10 @@
         </nav>
       </header>
       <section class="page-main">
-        <h1>Creator login</h1>
+        <h1>Creator sign-in</h1>
         <p class="page-lead">
-          Sign in if you already have an account. New here?
-          <a href="./creators-register-en.html">Create a creator account</a>.
+          Already have an account? Sign in below. New to Buildy?
+          <a href="./creators-register-en.html">Join as a creator</a>.
         </p>
         <p id="login-loading" class="page-lead" style="margin-bottom: 1rem; color: var(--text-sub);">Checking configuration…</p>
 
@@ -51,7 +51,7 @@
           <p class="page-lead">
             Set Supabase URL and anon key in the environment to enable email/password or Google sign-in.
           </p>
-          <p><a href="./creators-register-en.html" class="btn primary-btn">Creator signup (email only)</a></p>
+          <p><a href="./creators-register-en.html" class="btn primary-btn">Sign up with email only</a></p>
         </div>
 
         <p id="login-result" style="margin-top: 1rem; min-height: 1.5em;"></p>
@@ -98,7 +98,7 @@
                 if (!base.endsWith("/")) base = base + "/";
                 window.location.replace(window.location.origin + base + "creator-dashboard-en.html");
               } else {
-                throw new Error("Could not load creator profile. Please sign up first.");
+                throw new Error("No creator profile found. Sign up as a creator first.");
               }
             });
         }

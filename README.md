@@ -30,6 +30,12 @@ open index.html   # macOS（トップは英語。日本語は index-ja.html）
 - `index-en.html` — 互換用リダイレクト → `index.html`
 - `styles.css` — レイアウト・タイポグラフィ・レスポンシブ対応等のスタイル
 
+### English (deploy note)
+
+If submitting a **new agent listing** returns **`database_schema`**, your Supabase `agents` table is missing columns. In **SQL Editor**, run `docs/supabase-agents-github-repo.sql` then `docs/supabase-agents-public-ui.sql` from this repo.
+
+For **CSP / `connect-src`**: Supabase Realtime uses **`wss:`**. This repo’s `vercel.json` allows `https:` and `wss:` for fetches and websockets.
+
 ## Supabase（本番でエージェント追加が `database_schema` になる場合）
 
 `agents` テーブルが古いままだと、`github_repo` / `public_ui_url` カラムがなく **503 + `database_schema`** になります。Supabase → **SQL Editor** で、リポジトリの次を **この順で** 実行してください。

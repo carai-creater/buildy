@@ -13,7 +13,7 @@
         <nav class="page-nav">
           <a href="./index.html">Home</a>
           <a href="./categories-en.html">Categories</a>
-          <a href="./mypage-en.html">My page</a>
+          <a href="./mypage-en.html">Your agents</a>
           <a href="./index-ja.html" class="page-lang">日本語</a>
         </nav>
       </header>
@@ -21,10 +21,10 @@
         <h1>Agents</h1>
 
         <div id="agents-empty" class="page-empty" style="display: none;">
-          <p>No creator-published agents yet.</p>
+          <p>No agents here yet.</p>
           <p>
-            <a href="./creators-register-en.html" class="btn primary-btn">Sign up as a creator</a>
-            then <a href="./agent-add-en.html">add an agent</a>.
+            <a href="./creators-register-en.html" class="btn primary-btn">Become a creator</a>,
+            then <a href="./agent-add-en.html">list your first agent</a>.
           </p>
         </div>
         <div id="agents-grid" class="page-card-grid"></div>
@@ -60,11 +60,11 @@
                   " / run</p>" +
                   '<a href="./pay-en.html?agent=' +
                   encodeURIComponent(a.id) +
-                  '" class="btn primary-btn">Checkout to use</a>' +
+                  '" class="btn primary-btn">Pay &amp; run</a>' +
                   (a.publicUiUrl
                     ? '<p class="page-note" style="margin-top:0.65rem;font-size:13px"><a href="' +
                       String(a.publicUiUrl).replace(/&/g, "&amp;").replace(/"/g, "&quot;") +
-                      '" target="_blank" rel="noopener noreferrer">Creator-hosted UI</a> (after checkout)</p>'
+                      '" target="_blank" rel="noopener noreferrer">Open in creator’s app</a> (after purchase)</p>'
                     : "") +
                   "</article>"
                 );
@@ -74,7 +74,7 @@
           .catch(function () {
             empty.style.display = "block";
             empty.innerHTML =
-              "<p>Could not load the list.</p><p><a href=\"./creators-register-en.html\">Sign up</a> · <a href=\"./agent-add-en.html\">Add agent</a></p>";
+              "<p>We couldn't load agents.</p><p><a href=\"./creators-register-en.html\">Become a creator</a> · <a href=\"./agent-add-en.html\">List an agent</a></p>";
           });
         function escapeHtml(s) {
           var div = document.createElement("div");

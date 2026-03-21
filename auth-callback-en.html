@@ -70,7 +70,7 @@
 
             function onSession(session) {
               if (!session || !session.access_token) {
-                showError("Could not obtain a session.");
+                showError("No session returned. Try signing in again.");
                 return;
               }
               var isUser = nextDest === "user";
@@ -128,14 +128,14 @@
                 .then(function (res) { return res.data.session; })
                 .then(onSession)
                 .catch(function (err) {
-                  showError(err.message || "Could not complete sign-in.");
+                  showError(err.message || "Sign-in didn't finish. Try again.");
                 });
               return;
             }
             showError("No auth data found. Please try again from the email link or sign-in page.");
           })
           .catch(function () {
-            showError("Could not load configuration.");
+            showError("App configuration failed to load. Refresh the page.");
           });
       })();
     </script>

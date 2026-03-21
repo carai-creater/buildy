@@ -128,7 +128,7 @@
             .then(function (x) {
               loading.style.display = "none";
               if (!x.ok) {
-                showError((x.j && x.j.message) || x.j.error || "Could not confirm card payment.");
+                showError((x.j && x.j.message) || x.j.error || "We couldn't verify your card. Try again.");
                 return;
               }
               try {
@@ -163,7 +163,7 @@
             var data = _ref.j;
             loading.style.display = "none";
             if (!ok) {
-              showError((data && data.message) || data.error || "Could not start checkout.");
+              showError((data && data.message) || data.error || "Checkout didn't start. Try again.");
               return;
             }
             intent = data;
@@ -274,7 +274,7 @@
                   params: [{ chainId: "0x" + Number(data.chainId).toString(16) }],
                 });
               } catch (e) {
-                walletStatus.textContent = "Could not switch network: " + (e.message || e);
+                walletStatus.textContent = "Couldn't switch networks: " + (e.message || e);
                 return;
               }
               var provider = new ethers.BrowserProvider(window.ethereum);

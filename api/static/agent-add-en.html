@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Add agent | Buildy</title>
+    <title>List your agent | Buildy</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -14,28 +14,28 @@
           <a href="./index.html">Home</a>
           <a href="./agents-en.html">Agents</a>
           <a href="./creator-dashboard-en.html">Dashboard</a>
-          <a href="./creators-register-en.html">Creator signup</a>
+          <a href="./creators-register-en.html">Become a creator</a>
           <a href="./index-ja.html" class="page-lang">日本語</a>
         </nav>
       </header>
       <section class="page-main">
-        <h1>Add agent</h1>
-        <p class="page-lead">Publishing requires a <strong>GitHub repo</strong> and a <strong>public HTTPS URL</strong> for your end-user UI (e.g. GitHub Pages). Users complete checkout on Buildy, then use your UI to call <code>POST /api/agent/execute</code>. See <a href="./docs/creator-ui.md">docs/creator-ui.md</a>. <a href="./creators-register-en.html">Creator signup</a> is required first.</p>
+        <h1>List your agent</h1>
+        <p class="page-lead">You’ll need a <strong>GitHub repository</strong> and a <strong>live HTTPS URL</strong> for the UI your customers actually use (GitHub Pages works well). They pay on Buildy, then your app calls <code>POST /api/agent/execute</code>. Full setup: <a href="./docs/creator-ui.md">creator-ui.md</a>. New here? <a href="./creators-register-en.html">Create a creator account</a> first.</p>
         <div class="page-form" style="max-width: 32rem; margin-bottom: 1.5rem;">
           <h2 style="font-size: 1rem; margin-bottom: 0.5rem;">Import from GitHub</h2>
           <label for="github-repo">GitHub repo URL or owner/repo</label>
           <div style="display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap;">
             <input id="github-repo" type="text" placeholder="https://github.com/owner/repo or owner/repo" style="flex: 1; min-width: 12rem;" />
-            <button type="button" id="github-fetch-btn" class="btn primary-btn">Fetch repo</button>
+            <button type="button" id="github-fetch-btn" class="btn primary-btn">Look up repo</button>
           </div>
           <p id="github-fetch-result" style="margin-top: 0.5rem; font-size: 14px; color: var(--text-sub);"></p>
         </div>
         <form id="agent-form" class="page-form" style="max-width: 32rem;">
           <label for="github_repo">GitHub repository * (owner/repo or URL)</label>
           <input id="github_repo" name="github_repo" type="text" required placeholder="octocat/Hello-World" autocomplete="off" />
-          <label for="public_ui_url">End-user UI URL * (HTTPS)</label>
+          <label for="public_ui_url">Public app URL * (HTTPS)</label>
           <input id="public_ui_url" name="public_ui_url" type="url" required placeholder="https://you.github.io/your-agent/" autocomplete="off" />
-          <p class="page-note" style="font-size: 13px; color: var(--text-sub); margin-top: -0.25rem;">After checkout, users are sent here with <code>#buildy_access=…&amp;buildy_agent=…</code> in the URL hash.</p>
+          <p class="page-note" style="font-size: 13px; color: var(--text-sub); margin-top: -0.25rem;">After they pay, we send them here with <code>#buildy_access=…&amp;buildy_agent=…</code> in the URL hash so your app can pick up access.</p>
           <label for="name">Agent name *</label>
           <input id="name" name="name" type="text" required placeholder="e.g. Market research agent" />
           <label for="category">Category</label>
@@ -53,9 +53,9 @@
           </p>
           <p id="github-prompt-status" style="font-size: 13px; color: var(--text-sub); min-height: 1.25em;"></p>
           <textarea id="system_prompt" name="system_prompt" rows="4" placeholder="You are a helpful assistant. ..."></textarea>
-          <label for="creator_id">Creator ID (auto-filled when logged in; edit only for another account)</label>
+          <label for="creator_id">Creator ID (filled automatically when you’re signed in; override only if you’re acting for another account)</label>
           <input id="creator_id" name="creator_id" type="text" placeholder="uuid" autocomplete="off" />
-          <button type="submit" class="btn primary-btn">Add agent</button>
+          <button type="submit" class="btn primary-btn">Submit listing</button>
         </form>
         <p id="agent-result" style="margin-top: 1rem;"></p>
       </section>
@@ -179,7 +179,7 @@
           public_ui_url: document.getElementById("public_ui_url").value.trim(),
         };
         var resultEl = document.getElementById("agent-result");
-        resultEl.textContent = "Adding…";
+        resultEl.textContent = "Submitting…";
         resultEl.style.color = "";
         fetch("/api/config")
           .then(function (r) { return r.json(); })
@@ -200,7 +200,7 @@
           .then(function (ctx) {
             if (!payload.creator_id && !ctx.token) {
               resultEl.textContent =
-                "No creator ID. Sign in to the dashboard or paste the ID from creator signup.";
+                "We need your creator ID. Sign in from the dashboard, or paste the ID you got when you registered.";
               resultEl.style.color = "#c00";
               return;
             }
@@ -216,15 +216,15 @@
             if (!data) return;
             if (data.agent) {
               resultEl.innerHTML =
-                "Added: " +
+                "<strong>" +
                 data.agent.name +
-                " → <a href=\"./creator-dashboard-en.html\">Dashboard</a> / <a href=\"./agents-en.html\">List</a>";
+                "</strong> is live. <a href=\"./creator-dashboard-en.html\">Open dashboard</a> · <a href=\"./agents-en.html\">Browse catalog</a>";
             } else {
               resultEl.style.whiteSpace = "pre-wrap";
               var hintEn = data.messageEn || data.message || "";
               resultEl.textContent = hintEn
                 ? (data.error || "Error") + "\n\n" + hintEn
-                : "Error: " + (data.error || "Could not add agent");
+                : "Error: " + (data.error || "Something went wrong");
               resultEl.style.color = "#c00";
             }
           })

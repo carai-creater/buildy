@@ -52,7 +52,7 @@ function jsonTempoSchemaMissing(tableKey) {
 /** エンドユーザーがアクセスするクリエイター提供 UI（GitHub Pages 等）の HTTPS URL */
 function validatePublicUiUrl(raw) {
   const s = String(raw || "").trim();
-  if (!s) return { ok: false, error: "public_ui_url is required (your hosted UI where users run the agent)" };
+  if (!s) return { ok: false, error: "public_ui_url is required — the HTTPS URL where customers actually use your agent" };
   if (s.length > 2048) return { ok: false, error: "public_ui_url is too long" };
   try {
     const u = new URL(s);
@@ -60,17 +60,17 @@ function validatePublicUiUrl(raw) {
       u.protocol === "https:" ||
       (u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1"));
     if (!okProto) {
-      return { ok: false, error: "public_ui_url must use https:// (or http://localhost for local dev)" };
+      return { ok: false, error: "public_ui_url must be https:// (http://localhost is OK for local testing)" };
     }
     return { ok: true, value: s };
   } catch {
-    return { ok: false, error: "public_ui_url must be a valid absolute URL" };
+    return { ok: false, error: "public_ui_url must be a full URL (including https://)" };
   }
 }
 
 function validateGithubRepo(raw) {
   const s = String(raw || "").trim();
-  if (!s) return { ok: false, error: "github_repo is required (owner/repo or https://github.com/owner/repo)" };
+  if (!s) return { ok: false, error: "github_repo is required — use owner/repo or a github.com URL" };
   if (s.length > 500) return { ok: false, error: "github_repo is too long" };
   return { ok: true, value: s };
 }
@@ -1154,7 +1154,7 @@ app.post("/api/agents", async (req, res) => {
   if (!resolvedCreatorId) {
     return res.status(400).json({
       error:
-        "creator_id is required. Open the dashboard while logged in and use Add agent, or paste your creator ID.",
+        "creator_id is required. Sign in from the creator dashboard, or paste the creator ID from your registration email.",
     });
   }
   const id = `agent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -1180,7 +1180,7 @@ app.post("/api/agents", async (req, res) => {
       message:
         "Supabase で docs/supabase-agents-github-repo.sql と docs/supabase-agents-public-ui.sql を実行し、github_repo / public_ui_url カラムを追加してください。",
       messageEn:
-        "In Supabase → SQL Editor, run docs/supabase-agents-github-repo.sql and docs/supabase-agents-public-ui.sql from the Buildy repo to add the github_repo and public_ui_url columns.",
+        "Your Supabase `agents` table is missing columns. In the SQL Editor, run `docs/supabase-agents-github-repo.sql` then `docs/supabase-agents-public-ui.sql` from this repo, then try again.",
     });
   }
   if (result.error) return res.status(400).json({ error: result.error.message });

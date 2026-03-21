@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My page | Buildy</title>
+    <title>Your agents | Buildy</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -13,17 +13,17 @@
         <nav class="page-nav">
           <a href="./index.html">Home</a>
           <a href="./agents-en.html">Agents</a>
-          <a href="./mypage-en.html">My page</a>
-          <a href="./creators-register-en.html">Creator signup</a>
+          <a href="./mypage-en.html">Your agents</a>
+          <a href="./creators-register-en.html">Become a creator</a>
           <a href="./creator-dashboard-en.html">Dashboard</a>
-          <a href="./agent-add-en.html">Add agent</a>
+          <a href="./agent-add-en.html">List an agent</a>
           <a href="./index-ja.html" class="page-lang">日本語</a>
         </nav>
       </header>
       <section class="page-main">
         <div id="mypage-login" style="display: none;">
-          <h1>My page</h1>
-          <p class="page-lead">Sign in to see AI agents you’ve used.</p>
+          <h1>Your agents</h1>
+          <p class="page-lead">Sign in to see agents you’ve run on Buildy.</p>
           <div id="mypage-google-area" style="display: none; margin-bottom: 1rem;">
             <button type="button" id="mypage-google-btn" class="btn primary-btn" style="display: inline-flex; align-items: center; gap: 0.5rem;">
               <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
@@ -39,19 +39,19 @@
           <p id="login-result" style="margin-top: 0.75rem; min-height: 1.5em;"></p>
         </div>
         <div id="mypage-content" style="display: none;">
-          <h1>My page</h1>
+          <h1>Your agents</h1>
           <p id="mypage-welcome" class="page-lead"></p>
           <p style="margin-top: 0.5rem;"><button type="button" id="mypage-logout" class="btn">Sign out</button></p>
 
           <h2 style="margin-top: 2rem;">Agents you’ve used</h2>
-          <p class="page-lead">Agents you run from the homepage appear here.</p>
+          <p class="page-lead">Anything you launch from the Buildy home page shows up here.</p>
           <div id="mypage-agents" class="page-card-grid"></div>
           <div id="mypage-agents-empty" class="page-empty" style="display: none;">
             <p>You haven’t used any agents yet.</p>
-            <p><a href="./index.html" class="btn primary-btn">Find agents</a> / <a href="./agents-en.html">Browse all</a></p>
+            <p><a href="./index.html" class="btn primary-btn">Discover agents</a> · <a href="./agents-en.html">Browse the catalog</a></p>
           </div>
 
-          <p style="margin-top: 2rem;"><a href="./agents-en.html" class="btn primary-btn">Discover more agents</a></p>
+          <p style="margin-top: 2rem;"><a href="./agents-en.html" class="btn primary-btn">Explore more agents</a></p>
         </div>
       </section>
     </main>
@@ -142,7 +142,7 @@
                     } catch (_) {}
                     location.reload();
                   } else {
-                    loginResult.textContent = "Error: Could not load user.";
+                    loginResult.textContent = "We couldn't load your profile. Try again.";
                     loginResult.style.color = "#c00";
                   }
                 })
@@ -186,7 +186,7 @@
                   '<p class="page-agent-price">¥' + price + " / run</p>" +
                   '<p style="margin-top: 0.75rem;"><a href="./pay-en.html?agent=' +
                   encodeURIComponent(a.id) +
-                  '" class="btn primary-btn">Use</a></p>' +
+                  '" class="btn primary-btn">Run</a></p>' +
                   "</article>"
                 );
               })
@@ -196,7 +196,7 @@
             welcomeEl.textContent = "Welcome.";
             if (agentsEmpty) {
               agentsEmpty.style.display = "block";
-              agentsEmpty.innerHTML = "<p>Could not load data. Please refresh and try again.</p>";
+              agentsEmpty.innerHTML = "<p>We couldn't load this. Refresh and try again.</p>";
             }
           });
 

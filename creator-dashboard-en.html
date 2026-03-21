@@ -12,15 +12,15 @@
         <a href="./index.html" class="page-logo">Buildy</a>
         <nav class="page-nav">
           <a href="./index.html">Home</a>
-          <a href="./agents-en.html">Public catalog</a>
-          <a href="./agent-add-en.html">Add agent</a>
+          <a href="./agents-en.html">Browse agents</a>
+          <a href="./agent-add-en.html">List an agent</a>
           <a href="./creator-dashboard.html" class="page-lang">日本語</a>
         </nav>
       </header>
       <section class="page-main">
         <div id="dashboard-please-register" class="page-empty" style="display: none; padding: 3rem 1.5rem;">
           <h1>Creator dashboard</h1>
-          <p>Sign in, or create an account if you’re new.</p>
+          <p>Sign in to your creator account, or sign up to get started.</p>
           <p style="display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; margin-top: 1rem;">
             <a href="./creators-login-en.html" class="btn primary-btn">Sign in</a>
             <a href="./creators-register-en.html" class="btn ghost-btn">Sign up</a>
@@ -35,26 +35,26 @@
               <button type="button" class="cd-sidebar-link active" data-tab="tab-agents">Agents</button>
               <button type="button" class="cd-sidebar-link" data-tab="tab-analytics">Earnings</button>
               <button type="button" class="cd-sidebar-link" data-tab="tab-profile">Profile</button>
-              <button type="button" class="cd-sidebar-link" data-tab="tab-other">Other</button>
+              <button type="button" class="cd-sidebar-link" data-tab="tab-other">More</button>
             </div>
             <div class="cd-sidebar-footer">
-              <a href="./index.html">← Back to home</a>
+              <a href="./index.html">Back to home</a>
             </div>
           </aside>
 
           <div class="cd-workspace">
             <header class="cd-workspace-head">
-              <h1>My page</h1>
+              <h1>Dashboard</h1>
               <p id="dashboard-welcome" class="page-lead"></p>
             </header>
 
             <div id="tab-agents" class="cd-tab-panel is-active">
               <div id="dashboard-after-register" class="cd-banner" style="display: none;">
-                <p>You’re set. Use “Add agent” to publish your first agent to the list.</p>
+                <p>You’re all set. <strong>List your first agent</strong> to go live on Buildy.</p>
               </div>
               <div class="cd-toolbar">
-                <span class="cd-toolbar-title">Your uploaded agents</span>
-                <a href="./agent-add-en.html" class="btn primary-btn">+ Add agent</a>
+                <span class="cd-toolbar-title">Your listed agents</span>
+                <a href="./agent-add-en.html" class="btn primary-btn">+ List an agent</a>
               </div>
               <div class="cd-panel">
                 <div class="cd-split">
@@ -107,14 +107,14 @@
 
             <div id="tab-other" class="cd-tab-panel">
               <div class="dashboard-section" style="margin: 0; border-radius: 8px;">
-                <h2 style="margin-top: 0;">Other</h2>
+                <h2 style="margin-top: 0;">More</h2>
                 <ul style="margin: 0; padding-left: 1.25rem; font-size: 14px;">
-                  <li><a href="./agent-add-en.html">Add an agent</a></li>
-                  <li><a href="./agents-en.html">Public agent catalog</a></li>
+                  <li><a href="./agent-add-en.html">List an agent</a></li>
+                  <li><a href="./agents-en.html">Browse all agents</a></li>
                   <li><a href="./index.html">Home</a></li>
                 </ul>
                 <p style="margin-top: 1.25rem;">
-                  <button type="button" id="dashboard-logout" class="btn">Sign out (clear saved login)</button>
+                  <button type="button" id="dashboard-logout" class="btn">Sign out</button>
                 </p>
               </div>
             </div>
@@ -447,7 +447,7 @@
             .catch(function () {
               pleaseRegister.style.display = "block";
               pleaseRegister.innerHTML =
-                '<h1>Creator dashboard</h1><p>Could not load your account. Try <a href="./creators-login-en.html">sign in</a> or <a href="./creators-register-en.html">sign up</a>.</p>';
+                '<h1>Creator dashboard</h1><p>We couldn\'t load your account. <a href="./creators-login-en.html">Sign in</a> or <a href="./creators-register-en.html">create an account</a>.</p>';
             });
         }
 
