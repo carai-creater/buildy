@@ -29,6 +29,25 @@ function jsonAccessTokenSecretMissing() {
   };
 }
 
+/** PostgREST / Supabase: table missing or not in schema cache yet */
+function supabaseSaysTableMissing(msg) {
+  const m = String(msg || "");
+  return /relation|does not exist|Could not find the table/i.test(m);
+}
+
+function jsonTempoSchemaMissing(tableKey) {
+  const tip = {
+    message:
+      "In Supabase → SQL Editor, run docs/supabase-tempo-payments.sql from the Buildy repo, then retry.",
+    messageJa:
+      "Supabase の SQL エディタでリポジトリの docs/supabase-tempo-payments.sql を実行してから再度お試しください。",
+  };
+  if (tableKey === "intents") {
+    return { error: "tempo_payment_intents missing", ...tip };
+  }
+  return { error: "tempo_access_grants missing", ...tip };
+}
+
 function publicOrigin(req) {
   const envBase = (process.env.BUILDY_PUBLIC_URL || process.env.NEXT_PUBLIC_SITE_URL || "").trim().replace(/\/$/, "");
   if (envBase) return envBase;
@@ -334,11 +353,8 @@ app.post("/api/payments/tempo/intent", async (req, res) => {
 
   const { error: insErr } = await supabase.from("tempo_payment_intents").insert(row);
   if (insErr) {
-    if (/relation|does not exist/i.test(insErr.message || "")) {
-      return res.status(503).json({
-        error: "tempo_payment_intents missing",
-        message: "Supabase で docs/supabase-tempo-payments.sql を実行してください。",
-      });
+    if (supabaseSaysTableMissing(insErr.message)) {
+      return res.status(503).json(jsonTempoSchemaMissing("intents"));
     }
     // その他の一時エラー時はメモリに保持（開発用・非推奨）
     tempoIntentMemory.set(orderId, { ...row, agent_name: agent.name });
@@ -437,11 +453,8 @@ app.post("/api/payments/tempo/verify", async (req, res) => {
 
   let grantId;
   if (gErr || !grant) {
-    if (/relation|does not exist/i.test(gErr?.message || "")) {
-      return res.status(503).json({
-        error: "tempo_access_grants missing",
-        message: "Supabase で docs/supabase-tempo-payments.sql を実行してください。",
-      });
+    if (supabaseSaysTableMissing(gErr?.message)) {
+      return res.status(503).json(jsonTempoSchemaMissing("grants"));
     }
     if (/duplicate|unique|violates unique constraint/i.test(gErr?.message || "")) {
       return res.status(400).json({ error: "この取引はすでに登録されています。" });
@@ -537,11 +550,8 @@ app.post("/api/payments/tempo/confirm-free", async (req, res) => {
   const { data: grant, error: gErr } = await supabase.from("tempo_access_grants").insert(grantRow).select("id").single();
 
   if (gErr || !grant) {
-    if (/relation|does not exist/i.test(gErr?.message || "")) {
-      return res.status(503).json({
-        error: "tempo_access_grants missing",
-        message: "Supabase で docs/supabase-tempo-payments.sql を実行してください。",
-      });
+    if (supabaseSaysTableMissing(gErr?.message)) {
+      return res.status(503).json(jsonTempoSchemaMissing("grants"));
     }
     return res.status(400).json({ error: gErr?.message || "failed to save grant" });
   }
@@ -699,11 +709,8 @@ app.post("/api/payments/stripe/complete", async (req, res) => {
         .select("id")
         .single();
       if (gErr || !grant) {
-        if (/relation|does not exist/i.test(gErr?.message || "")) {
-          return res.status(503).json({
-            error: "tempo_access_grants missing",
-            message: "Supabase で docs/supabase-tempo-payments.sql を実行してください。",
-          });
+        if (supabaseSaysTableMissing(gErr?.message)) {
+          return res.status(503).json(jsonTempoSchemaMissing("grants"));
         }
         if (/duplicate|unique|violates unique constraint/i.test(gErr?.message || "")) {
           const { data: again } = await supabase.from("tempo_access_grants").select("id").eq("tx_hash", txHash).maybeSingle();
